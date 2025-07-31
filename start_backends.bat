@@ -1,9 +1,8 @@
 @echo off
 echo Starting backend servers...
 
-set /p fail_rate=Enter failure rate for testing (0-100, default 0): 
-
-if "%fail_rate%"=="" set fail_rate=0
+set fail_rate=0
+echo Using failure rate: %fail_rate%
 
 start "Backend 1" cmd /k "backend1.exe --port=8081 --id=1 --fail-rate=%fail_rate%"
 start "Backend 2" cmd /k "backend2.exe --port=8082 --id=2 --fail-rate=%fail_rate%"
