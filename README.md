@@ -5,9 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/0xReLogic/Helios)](https://goreportcard.com/report/github.com/0xReLogic/Helios)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/0xReLogic/Helios)](https://github.com/0xReLogic/Helios)
 [![License](https://img.shields.io/github/license/0xReLogic/Helios)](https://github.com/0xReLogic/Helios/blob/main/LICENSE)
-[![Release](https://img.shields.io/github/v/release/0xReLogic/Helios?include_prereleases)](https://github.com/0xReLogic/Helios/releases)
-[![Build Status](https://img.shields.io/github/workflow/status/0xReLogic/Helios/build)](https://github.com/0xReLogic/Helios/actions)
-[![Coverage](https://img.shields.io/codecov/c/github/0xReLogic/Helios)](https://codecov.io/gh/0xReLogic/Helios)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/0xReLogic/Helios/go.yml?branch=main)](https://github.com/0xReLogic/Helios/actions)
 [![Go Reference](https://pkg.go.dev/badge/github.com/0xReLogic/Helios.svg)](https://pkg.go.dev/github.com/0xReLogic/Helios)
 
 </div>
