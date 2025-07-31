@@ -1,5 +1,13 @@
 server:
   port: 8080
 
-backend:
-  address: "http://localhost:8081"
+backends:
+  - name: "server1"
+    address: "http://localhost:8081"
+  - name: "server2"
+    address: "http://localhost:8082"
+  - name: "server3"
+    address: "http://localhost:8083"
+
+load_balancer:
+  strategy: "round_robin"  # Strategi load balancing (round_robin, least_connections, dll)

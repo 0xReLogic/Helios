@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/0xReLogic/Helios/internal/config"
-	"github.com/0xReLogic/Helios/internal/proxy"
+	"github.com/0xReLogic/Helios/internal/loadbalancer"
 )
 
 func main() {
@@ -17,22 +17,27 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Create reverse proxy
-	reverseProxy, err := proxy.NewReverseProxy(cfg)
+	// Create load balancer
+	lb, err := loadbalancer.NewLoadBalancer(cfg)
 	if err != nil {
-		log.Fatalf("Failed to create reverse proxy: %v", err)
+		log.Fatalf("Failed to create load balancer: %v", err)
 	}
 
 	// Setup HTTP server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{
 		Addr:    addr,
-		Handler: reverseProxy,
+		Handler: lb,
 	}
 
 	// Start server
-	log.Printf("Helios reverse proxy starting on port %d", cfg.Server.Port)
-	log.Printf("Proxying requests to backend: %s", cfg.Backend.Address)
+	log.Printf("Helios load balancer starting on port %d", cfg.Server.Port)
+	log.Printf("Load balancing strategy: %s", cfg.LoadBalancer.Strategy)
+	log.Printf("Backend servers:")
+	for _, backend := range cfg.Backends {
+		log.Printf("  - %s (%s)", backend.Name, backend.Address)
+	}
+
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 		os.Exit(1)

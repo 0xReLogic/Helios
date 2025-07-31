@@ -4,15 +4,15 @@
 
 ## Current Status
 
-This project is in active development. Currently implementing Phase 1: Core Reverse Proxy functionality.
+This project is in active development. Currently implementing Phase 2: Load Balancing functionality.
 
-## Features (Planned)
+## Features
 
-- HTTP reverse proxy
-- Load balancing with multiple strategies
-- Health checks (passive and active)
-- Configuration via YAML
-- High performance and low resource usage
+- ✅ HTTP reverse proxy
+- ✅ Load balancing with Round Robin strategy
+- 🔄 Health checks (passive and active) - Coming soon
+- ✅ Configuration via YAML
+- ✅ High performance and low resource usage
 
 ## Getting Started
 
@@ -38,12 +38,21 @@ This project is in active development. Currently implementing Phase 1: Core Reve
    ./helios
    ```
 
-### Running the Test Backend
+### Running the Test Backends
 
-For testing purposes, a simple backend server is included:
+For testing purposes, simple backend servers are included. You can run them with different ports and IDs:
 
 ```
-go run ./cmd/backend/main.go
+# Run multiple backend servers
+go run ./cmd/backend/main.go --port=8081 --id=1
+go run ./cmd/backend/main.go --port=8082 --id=2
+go run ./cmd/backend/main.go --port=8083 --id=3
+```
+
+Or use the provided batch script:
+
+```
+start_backends.bat
 ```
 
 ## Configuration
@@ -54,9 +63,33 @@ Configuration is done via `helios.yaml`:
 server:
   port: 8080
 
-backend:
-  address: "http://localhost:8081"
+backends:
+  - name: "server1"
+    address: "http://localhost:8081"
+  - name: "server2"
+    address: "http://localhost:8082"
+  - name: "server3"
+    address: "http://localhost:8083"
+
+load_balancer:
+  strategy: "round_robin"  # Currently only round_robin is supported
 ```
+
+## Testing Load Balancing
+
+To test that load balancing is working correctly, you can use the provided batch script:
+
+```
+test_load_balancing.bat
+```
+
+Or manually send multiple requests to the proxy:
+
+```
+curl http://localhost:8080
+```
+
+You should see responses from different backend servers as the requests are distributed using the round-robin strategy.
 
 ## License
 

@@ -33,15 +33,15 @@ Definisi "Menang": "Pipa" berhasil menyalurkan data dari depan ke belakang.
 FASE 2: THE LOAD BALANCER (Target: Minggu 1-2)
 (Tujuan: Mengubah "pipa" menjadi "persimpangan cerdas" yang bisa membagi traffic.)
 
-[ ] Milestone 2.1: Konfigurasi Multi-Backend
+[✓] Milestone 2.1: Konfigurasi Multi-Backend
 
-[ ] Ubah helios.yaml agar bisa menerima daftar alamat backend server.
+[✓] Ubah helios.yaml agar bisa menerima daftar alamat backend server.
 
-[ ] Milestone 2.2: Implementasi Strategi Round Robin
+[✓] Milestone 2.2: Implementasi Strategi Round Robin
 
-[ ] Buat sebuah struct atau module untuk mengelola pool backend server.
+[✓] Buat sebuah struct atau module untuk mengelola pool backend server.
 
-[ ] Refaktor logika proxy. Sekarang, sebelum meneruskan permintaan, pilih satu server backend dari pool secara bergiliran (round robin).
+[✓] Refaktor logika proxy. Sekarang, sebelum meneruskan permintaan, pilih satu server backend dari pool secara bergiliran (round robin).
 
 [ ] Milestone 2.3: Pengujian Distribusi Beban
 
