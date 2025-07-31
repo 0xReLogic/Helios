@@ -40,3 +40,6 @@ Thumbs.db
 
 # Config files that might contain sensitive information
 config.local.yaml
+
+# Project management files
+todo.txt
