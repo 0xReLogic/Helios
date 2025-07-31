@@ -10,4 +10,15 @@ backends:
     address: "http://localhost:8083"
 
 load_balancer:
-  strategy: "round_robin"  # Strategi load balancing (round_robin, least_connections, dll)
+  strategy: "least_connections"  # Strategi load balancing (round_robin, least_connections)
+  
+health_checks:
+  active:
+    enabled: true
+    interval: 10  # Interval in seconds
+    timeout: 5    # Timeout in seconds
+    path: "/health"
+  passive:
+    enabled: true
+    unhealthy_threshold: 1  # Number of failures before marking as unhealthy
+    unhealthy_timeout: 30   # Time in seconds to keep backend unhealthy

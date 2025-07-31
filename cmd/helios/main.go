@@ -38,6 +38,25 @@ func main() {
 		log.Printf("  - %s (%s)", backend.Name, backend.Address)
 	}
 
+	// Log health check configuration
+	log.Printf("Health check configuration:")
+	if cfg.HealthChecks.Active.Enabled {
+		log.Printf("  - Active health checks: Enabled (interval: %ds, timeout: %ds, path: %s)",
+			cfg.HealthChecks.Active.Interval,
+			cfg.HealthChecks.Active.Timeout,
+			cfg.HealthChecks.Active.Path)
+	} else {
+		log.Printf("  - Active health checks: Disabled")
+	}
+
+	if cfg.HealthChecks.Passive.Enabled {
+		log.Printf("  - Passive health checks: Enabled (threshold: %d, timeout: %ds)",
+			cfg.HealthChecks.Passive.UnhealthyThreshold,
+			cfg.HealthChecks.Passive.UnhealthyTimeout)
+	} else {
+		log.Printf("  - Passive health checks: Disabled")
+	}
+
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 		os.Exit(1)

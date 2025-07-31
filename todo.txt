@@ -52,19 +52,19 @@ FASE 2: THE LOAD BALANCER (Target: Minggu 1-2)
 FASE 3: MAKING IT "PINTAR" (Target: Minggu 3-4)
 (Tujuan: Memberi Helios kemampuan untuk mendeteksi "kesehatan" backend dan membuat keputusan yang lebih baik.)
 
-[ ] Milestone 3.1: Passive Health Checks
+[✓] Milestone 3.1: Passive Health Checks
 
-[ ] Implementasikan logika di load balancer. Jika sebuah backend gagal merespons (misal: timeout atau error 5xx), tandai sebagai "tidak sehat" dan jangan kirimi traffic selama beberapa waktu (misal: 30 detik).
+[✓] Implementasikan logika di load balancer. Jika sebuah backend gagal merespons (misal: timeout atau error 5xx), tandai sebagai "tidak sehat" dan jangan kirimi traffic selama beberapa waktu (misal: 30 detik).
 
-[ ] Milestone 3.2: Active Health Checks
+[✓] Milestone 3.2: Active Health Checks
 
-[ ] Buat sebuah goroutine di latar belakang yang secara periodik (misal: setiap 10 detik) mengirim permintaan ke endpoint /health di setiap backend server.
+[✓] Buat sebuah goroutine di latar belakang yang secara periodik (misal: setiap 10 detik) mengirim permintaan ke endpoint /health di setiap backend server.
 
-[ ] Jika sebuah backend gagal dalam pengecekan kesehatan, hapus dari pool aktif. Jika sehat kembali, masukkan lagi.
+[✓] Jika sebuah backend gagal dalam pengecekan kesehatan, hapus dari pool aktif. Jika sehat kembali, masukkan lagi.
 
-[ ] Milestone 3.3: Strategi Load Balancing Baru
+[✓] Milestone 3.3: Strategi Load Balancing Baru
 
-[ ] Implementasikan algoritma load balancing alternatif, misalnya Least Connections (kirim ke server dengan koneksi aktif paling sedikit).
+[✓] Implementasikan algoritma load balancing alternatif, misalnya Least Connections (kirim ke server dengan koneksi aktif paling sedikit).
 
 FASE 4: OPEN SOURCE READINESS (Jangka Panjang)
 (Tujuan: Memoles proyek agar siap dipamerkan dan dikontribusikan.)

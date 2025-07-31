@@ -4,13 +4,17 @@
 
 ## Current Status
 
-This project is in active development. Currently implementing Phase 2: Load Balancing functionality.
+This project is in active development. Currently implementing Phase 3: Smart Health Checks and Advanced Load Balancing functionality.
 
 ## Features
 
 - ✅ HTTP reverse proxy
-- ✅ Load balancing with Round Robin strategy
-- 🔄 Health checks (passive and active) - Coming soon
+- ✅ Load balancing with multiple strategies:
+  - ✅ Round Robin
+  - ✅ Least Connections
+- ✅ Health checks:
+  - ✅ Passive health checks (detect and mark unhealthy backends based on response status)
+  - ✅ Active health checks (periodically check backend health)
 - ✅ Configuration via YAML
 - ✅ High performance and low resource usage
 

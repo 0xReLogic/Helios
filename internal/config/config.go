@@ -12,6 +12,7 @@ type Config struct {
 	Server       ServerConfig       `yaml:"server"`
 	Backends     []BackendConfig    `yaml:"backends"`
 	LoadBalancer LoadBalancerConfig `yaml:"load_balancer"`
+	HealthChecks HealthChecksConfig `yaml:"health_checks"`
 }
 
 // ServerConfig holds the server configuration
@@ -28,6 +29,27 @@ type BackendConfig struct {
 // LoadBalancerConfig holds the load balancer configuration
 type LoadBalancerConfig struct {
 	Strategy string `yaml:"strategy"`
+}
+
+// HealthChecksConfig holds the health check configuration
+type HealthChecksConfig struct {
+	Active  ActiveHealthCheckConfig  `yaml:"active"`
+	Passive PassiveHealthCheckConfig `yaml:"passive"`
+}
+
+// ActiveHealthCheckConfig holds the active health check configuration
+type ActiveHealthCheckConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Interval int    `yaml:"interval"`
+	Timeout  int    `yaml:"timeout"`
+	Path     string `yaml:"path"`
+}
+
+// PassiveHealthCheckConfig holds the passive health check configuration
+type PassiveHealthCheckConfig struct {
+	Enabled            bool `yaml:"enabled"`
+	UnhealthyThreshold int  `yaml:"unhealthy_threshold"`
+	UnhealthyTimeout   int  `yaml:"unhealthy_timeout"`
 }
 
 // LoadConfig loads configuration from the specified YAML file
