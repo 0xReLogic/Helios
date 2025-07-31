@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -17,7 +18,12 @@ type ReverseProxy struct {
 
 // NewReverseProxy creates a new reverse proxy instance
 func NewReverseProxy(cfg *config.Config) (*ReverseProxy, error) {
-	backendURL, err := url.Parse(cfg.Backend.Address)
+	// Use the first backend as the default target
+	if len(cfg.Backends) == 0 {
+		return nil, fmt.Errorf("no backends configured")
+	}
+
+	backendURL, err := url.Parse(cfg.Backends[0].Address)
 	if err != nil {
 		return nil, err
 	}
