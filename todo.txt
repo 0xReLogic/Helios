@@ -43,11 +43,11 @@ FASE 2: THE LOAD BALANCER (Target: Minggu 1-2)
 
 [✓] Refaktor logika proxy. Sekarang, sebelum meneruskan permintaan, pilih satu server backend dari pool secara bergiliran (round robin).
 
-[ ] Milestone 2.3: Pengujian Distribusi Beban
+[✓] Milestone 2.3: Pengujian Distribusi Beban
 
-[ ] Jalankan beberapa server backend palsu, masing-masing dengan respons yang unik (misal: "Halo dari Server 1", "Halo dari Server 2").
+[✓] Jalankan beberapa server backend palsu, masing-masing dengan respons yang unik (misal: "Halo dari Server 1", "Halo dari Server 2").
 
-[ ] Kirim beberapa permintaan ke Helios dan pastikan responsnya berubah-ubah, membuktikan bahwa load balancing berfungsi.
+[✓] Kirim beberapa permintaan ke Helios dan pastikan responsnya berubah-ubah, membuktikan bahwa load balancing berfungsi.
 
 FASE 3: MAKING IT "PINTAR" (Target: Minggu 3-4)
 (Tujuan: Memberi Helios kemampuan untuk mendeteksi "kesehatan" backend dan membuat keputusan yang lebih baik.)
