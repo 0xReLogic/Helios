@@ -69,14 +69,14 @@ FASE 3: MAKING IT "PINTAR" (Target: Minggu 3-4)
 FASE 4: OPEN SOURCE READINESS (Jangka Panjang)
 (Tujuan: Memoles proyek agar siap dipamerkan dan dikontribusikan.)
 
-[ ] Milestone 4.1: Dokumentasi & Pengujian
+[✓] Milestone 4.1: Dokumentasi & Pengujian
 
-[ ] Tulis README.md yang komprehensif.
+[✓] Tulis README.md yang komprehensif.
 
-[ ] Buat unit test dan integration test untuk setiap strategi load balancing dan health check.
+[✓] Buat unit test dan integration test untuk setiap strategi load balancing dan health check.
 
-[ ] Miladece 4.2: CI/CD & Rilis
+[✓] Milestone 4.2: CI/CD & Rilis
 
-[ ] Buat workflow GitHub Actions untuk menjalankan tes secara otomatis.
+[✓] Buat workflow GitHub Actions untuk menjalankan tes secara otomatis.
 
-[ ] Siapkan proses rilis untuk binary-nya.
+[✓] Siapkan proses rilis untuk binary-nya.

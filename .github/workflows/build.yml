@@ -1,0 +1,131 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go: ['1.18', '1.19', '1.20']
+    
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go }}
+      
+    - name: Check out code
+      uses: actions/checkout@v2
+      
+    - name: Get dependencies
+      run: go mod download
+      
+    - name: Build
+      run: go build -v ./...
+      
+    - name: Test
+      run: go test -v ./...
+      
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v2
+      with:
+        version: latest
+        args: --timeout=5m
+      
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.20'
+      
+    - name: Check out code
+      uses: actions/checkout@v2
+      
+    - name: Get dependencies
+      run: go mod download
+      
+    - name: Generate coverage report
+      run: go test -coverprofile=coverage.txt -covermode=atomic ./...
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage.txt
+        fail_ci_if_error: false
+        
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build, coverage]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+      
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.20'
+        
+    - name: Get dependencies
+      run: go mod download
+      
+    - name: Build for multiple platforms
+      run: |
+        mkdir -p dist
+        GOOS=linux GOARCH=amd64 go build -o dist/helios-linux-amd64 ./cmd/helios
+        GOOS=windows GOARCH=amd64 go build -o dist/helios-windows-amd64.exe ./cmd/helios
+        GOOS=darwin GOARCH=amd64 go build -o dist/helios-darwin-amd64 ./cmd/helios
+        
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+        
+    - name: Upload Linux Binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/helios-linux-amd64
+        asset_name: helios-linux-amd64
+        asset_content_type: application/octet-stream
+        
+    - name: Upload Windows Binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/helios-windows-amd64.exe
+        asset_name: helios-windows-amd64.exe
+        asset_content_type: application/octet-stream
+        
+    - name: Upload macOS Binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/helios-darwin-amd64
+        asset_name: helios-darwin-amd64
+        asset_content_type: application/octet-stream
