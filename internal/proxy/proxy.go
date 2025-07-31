@@ -34,7 +34,10 @@ func NewReverseProxy(cfg *config.Config) (*ReverseProxy, error) {
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Printf("Error proxying request: %v", err)
 		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte("Backend server is not available"))
+		_, writeErr := w.Write([]byte("Backend server is not available"))
+		if writeErr != nil {
+			log.Printf("Error writing response: %v", writeErr)
+		}
 	}
 
 	return &ReverseProxy{

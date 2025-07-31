@@ -164,7 +164,10 @@ func TestServeHTTP(t *testing.T) {
 	// Create a test server that always returns 200 OK
 	server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK from server1"))
+		_, err := w.Write([]byte("OK from server1"))
+		if err != nil {
+			t.Errorf("Failed to write response: %v", err)
+		}
 	}))
 	defer server1.Close()
 

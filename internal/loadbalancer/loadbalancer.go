@@ -121,11 +121,9 @@ func (lb *LoadBalancer) startActiveHealthChecks() {
 	// Run an initial health check immediately
 	lb.checkBackendsHealth()
 
-	for {
-		select {
-		case <-ticker.C:
-			lb.checkBackendsHealth()
-		}
+	// Use for range instead of for { select {} }
+	for range ticker.C {
+		lb.checkBackendsHealth()
 	}
 }
 

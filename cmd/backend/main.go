@@ -6,12 +6,11 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"time"
 )
 
 func main() {
-	// Initialize random seed
-	rand.Seed(time.Now().UnixNano())
+	// No need to initialize random seed in Go 1.20+
+	// rand.Seed is deprecated since Go 1.20
 
 	// Parse command line flags
 	port := flag.Int("port", 8081, "Port to run the backend server on")
