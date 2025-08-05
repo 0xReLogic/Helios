@@ -17,7 +17,15 @@ type Config struct {
 
 // ServerConfig holds the server configuration
 type ServerConfig struct {
-	Port int `yaml:"port"`
+	Port int       `yaml:"port"`
+	TLS  TLSConfig `yaml:"tls,omitempty"`
+}
+
+// TLSConfig holds the TLS configuration settings
+type TLSConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	CertFile string `yaml:"certFile"`
+	KeyFile  string `yaml:"keyFile"`
 }
 
 // BackendConfig holds the backend server configuration

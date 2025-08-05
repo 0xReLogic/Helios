@@ -163,6 +163,7 @@ health_checks:
 | Option | Description | Default |
 |--------|-------------|---------|
 | `port` | Port where Helios listens for incoming requests | `8080` |
+| `tls` | TLS configuration block. See details below. | `disabled` |
 
 #### Backend Configuration
 
@@ -183,6 +184,25 @@ Available strategies:
 - `least_connections`: Routes to the backend with the fewest active connections
 - `weighted_round_robin`: Distributes requests based on backend weights. A backend with a higher weight will receive proportionally more requests.
 - `ip_hash`: Distributes requests based on a hash of the client's IP address. This ensures that a user will consistently be routed to the same backend server.
+
+#### TLS Configuration
+
+To enable TLS/SSL, you can add the `tls` block to the `server` configuration.
+
+```yaml
+server:
+  port: 8080
+  tls:
+    enabled: true
+    certFile: "path/to/your/cert.pem"
+    keyFile: "path/to/your/key.pem"
+```
+
+| Option | Description | Required (if `tls` is enabled) |
+|--------|-------------|--------------------------------|
+| `enabled` | Set to `true` to enable TLS | Yes |
+| `certFile` | Path to the SSL certificate file | Yes |
+| `keyFile` | Path to the SSL private key file | Yes |
 
 #### Health Check Configuration
 
@@ -296,7 +316,7 @@ Contributions are welcome! Here's how you can contribute:
 - [x] Additional load balancing strategies
   - [x] Weighted Round Robin
   - [x] IP Hash
-- [ ] TLS/SSL support
+- [x] TLS/SSL support
 - [ ] Request rate limiting
 - [ ] Circuit breaker pattern implementation
 - [ ] Metrics and monitoring endpoints
