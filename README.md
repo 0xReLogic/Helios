@@ -18,6 +18,7 @@ Helios is a lightweight, high-performance HTTP reverse proxy and load balancer d
 ## Features
 
 - **HTTP Reverse Proxy**: Efficiently forwards HTTP requests to backend servers
+- **TLS/SSL Termination**: Secures traffic by terminating TLS connections.
 - **Advanced Load Balancing**: Multiple distribution strategies:
   - Round Robin - Distributes requests sequentially across all healthy backends
   - Least Connections - Routes to the backend with the fewest active connections
