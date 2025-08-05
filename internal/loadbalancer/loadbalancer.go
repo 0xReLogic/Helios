@@ -28,6 +28,7 @@ type Backend struct {
 	IsHealthy         bool
 	UnhealthyUntil    time.Time    // Time until which the backend is considered unhealthy
 	ActiveConnections int32        // Number of active connections
+	Weight            int          // Weight for weighted load balancing strategies
 	Mutex             sync.RWMutex // Mutex for thread-safe operations
 }
 
@@ -62,6 +63,8 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 		strategy = NewRoundRobinStrategy()
 	case "least_connections":
 		strategy = NewLeastConnectionsStrategy()
+	case "weighted_round_robin":
+		strategy = NewWeightedRoundRobinStrategy()
 	default:
 		// Default to round robin if not specified
 		strategy = NewRoundRobinStrategy()
@@ -203,13 +206,19 @@ func (lb *LoadBalancer) AddBackend(backendCfg config.BackendConfig) error {
 	proxy := httputil.NewSingleHostReverseProxy(backendURL)
 
 	// Create the backend
+	// If weight is not specified or is invalid, default to 1
+	weight := backendCfg.Weight
+	if weight < 1 {
+		weight = 1
+	}
 	backend := &Backend{
 		Name:              backendCfg.Name,
 		URL:               backendURL,
 		ReverseProxy:      proxy,
-		IsHealthy:         true,        // Assume healthy initially
+		IsHealthy:         true, // Assume healthy initially
 		UnhealthyUntil:    time.Time{}, // Zero time means it's healthy
 		ActiveConnections: 0,
+		Weight:            weight,
 	}
 
 	// Add to the strategy

@@ -24,6 +24,7 @@ type ServerConfig struct {
 type BackendConfig struct {
 	Name    string `yaml:"name"`
 	Address string `yaml:"address"`
+	Weight  int    `yaml:"weight,omitempty"`
 }
 
 // LoadBalancerConfig holds the load balancer configuration
