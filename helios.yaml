@@ -4,13 +4,16 @@ server:
 backends:
   - name: "server1"
     address: "http://localhost:8081"
+    weight: 5
   - name: "server2"
     address: "http://localhost:8082"
+    weight: 2
   - name: "server3"
     address: "http://localhost:8083"
+    weight: 1
 
 load_balancer:
-  strategy: "least_connections"  # Strategi load balancing (round_robin, least_connections)
+  strategy: "weighted_round_robin"  # Options: "round_robin", "least_connections", "weighted_round_robin"
   
 health_checks:
   active:
