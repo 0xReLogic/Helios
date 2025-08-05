@@ -17,7 +17,7 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "weighted_round_robin"  # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
+  strategy: "ip_hash"  # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
   
 health_checks:
   active:
