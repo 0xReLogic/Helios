@@ -131,13 +131,16 @@ server:
 backends:
   - name: "server1"
     address: "http://localhost:8081"
+    weight: 5
   - name: "server2"
     address: "http://localhost:8082"
+    weight: 2
   - name: "server3"
     address: "http://localhost:8083"
+    weight: 1
 
 load_balancer:
-  strategy: "least_connections"  # Options: "round_robin", "least_connections"
+  strategy: "weighted_round_robin"  # Options: "round_robin", "least_connections", "weighted_round_robin"
   
 health_checks:
   active:
@@ -165,6 +168,7 @@ health_checks:
 |--------|-------------|----------|
 | `name` | Unique identifier for the backend | Yes |
 | `address` | URL of the backend server | Yes |
+| `weight` | The weight for the backend, used by `weighted_round_robin`. Defaults to `1`. | No |
 
 #### Load Balancer Configuration
 
@@ -175,6 +179,7 @@ health_checks:
 Available strategies:
 - `round_robin`: Distributes requests sequentially across all healthy backends
 - `least_connections`: Routes to the backend with the fewest active connections
+- `weighted_round_robin`: Distributes requests based on backend weights. A backend with a higher weight will receive proportionally more requests.
 
 #### Health Check Configuration
 
@@ -285,7 +290,9 @@ Contributions are welcome! Here's how you can contribute:
 
 ## Roadmap
 
-- [X] Additional load balancing strategies (weighted round robin, IP hash)
+- [ ] Additional load balancing strategies
+  - [x] Weighted Round Robin
+  - [ ] IP Hash
 - [ ] TLS/SSL support
 - [ ] Request rate limiting
 - [ ] Circuit breaker pattern implementation
