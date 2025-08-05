@@ -57,8 +57,31 @@ func main() {
 		log.Printf("  - Passive health checks: Disabled")
 	}
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Server failed: %v", err)
-		os.Exit(1)
+	// Start the server with or without TLS based on configuration
+	if cfg.Server.TLS.Enabled {
+		log.Println("TLS is enabled.")
+
+		// Validate that cert and key files are specified
+		if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
+			log.Fatal("TLS is enabled, but certFile or keyFile is not specified in the configuration.")
+		}
+
+		// Check if the certificate and key files exist
+		if _, err := os.Stat(cfg.Server.TLS.CertFile); os.IsNotExist(err) {
+			log.Fatalf("TLS certificate file not found: %s", cfg.Server.TLS.CertFile)
+		}
+		if _, err := os.Stat(cfg.Server.TLS.KeyFile); os.IsNotExist(err) {
+			log.Fatalf("TLS key file not found: %s", cfg.Server.TLS.KeyFile)
+		}
+
+		log.Printf("Listening for HTTPS on port %d", cfg.Server.Port)
+		if err := server.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile); err != nil {
+			log.Fatalf("Failed to start TLS server: %v", err)
+		}
+	} else {
+		log.Printf("Listening for HTTP on port %d", cfg.Server.Port)
+		if err := server.ListenAndServe(); err != nil {
+			log.Fatalf("Failed to start HTTP server: %v", err)
+		}
 	}
 }

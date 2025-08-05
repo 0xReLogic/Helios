@@ -1,5 +1,9 @@
 server:
   port: 8080
+  tls:
+    enabled: false
+    certFile: "certs/cert.pem"
+    keyFile: "certs/key.pem"
 
 backends:
   - name: "server1"
@@ -13,7 +17,7 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "weighted_round_robin"  # Options: "round_robin", "least_connections", "weighted_round_robin"
+  strategy: "ip_hash"  # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
   
 health_checks:
   active:
