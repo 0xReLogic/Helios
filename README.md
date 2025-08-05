@@ -49,6 +49,8 @@ graph TD
         subgraph "Load Balancing Strategies"
             LoadBalancer --> RoundRobin[Round Robin]
             LoadBalancer --> LeastConn[Least Connections]
+            LoadBalancer --> WeightedRR[Weighted Round Robin]
+            LoadBalancer --> IPHash[IP Hash]
         end
     end
     
