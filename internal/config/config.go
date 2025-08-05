@@ -9,10 +9,13 @@ import (
 
 // Config represents the main configuration structure for Helios
 type Config struct {
-	Server       ServerConfig       `yaml:"server"`
-	Backends     []BackendConfig    `yaml:"backends"`
-	LoadBalancer LoadBalancerConfig `yaml:"load_balancer"`
-	HealthChecks HealthChecksConfig `yaml:"health_checks"`
+	Server         ServerConfig         `yaml:"server"`
+	Backends       []BackendConfig      `yaml:"backends"`
+	LoadBalancer   LoadBalancerConfig   `yaml:"load_balancer"`
+	HealthChecks   HealthChecksConfig   `yaml:"health_checks"`
+	RateLimit      RateLimitConfig      `yaml:"rate_limit"`
+	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
+	Metrics        MetricsConfig        `yaml:"metrics"`
 }
 
 // ServerConfig holds the server configuration
@@ -59,6 +62,30 @@ type PassiveHealthCheckConfig struct {
 	Enabled            bool `yaml:"enabled"`
 	UnhealthyThreshold int  `yaml:"unhealthy_threshold"`
 	UnhealthyTimeout   int  `yaml:"unhealthy_timeout"`
+}
+
+// RateLimitConfig holds the rate limiting configuration
+type RateLimitConfig struct {
+	Enabled    bool `yaml:"enabled"`
+	MaxTokens  int  `yaml:"max_tokens"`
+	RefillRate int  `yaml:"refill_rate_seconds"`
+}
+
+// CircuitBreakerConfig holds the circuit breaker configuration
+type CircuitBreakerConfig struct {
+	Enabled          bool `yaml:"enabled"`
+	MaxRequests      int  `yaml:"max_requests"`
+	IntervalSeconds  int  `yaml:"interval_seconds"`
+	TimeoutSeconds   int  `yaml:"timeout_seconds"`
+	FailureThreshold int  `yaml:"failure_threshold"`
+	SuccessThreshold int  `yaml:"success_threshold"`
+}
+
+// MetricsConfig holds the metrics configuration
+type MetricsConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Port    int    `yaml:"port"`
+	Path    string `yaml:"path"`
 }
 
 // LoadConfig loads configuration from the specified YAML file

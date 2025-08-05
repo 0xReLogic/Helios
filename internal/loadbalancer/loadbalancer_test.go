@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/0xReLogic/Helios/internal/metrics"
 )
 
 func TestRoundRobinStrategy(t *testing.T) {
@@ -198,8 +200,9 @@ func TestServeHTTP(t *testing.T) {
 
 	// Create a load balancer manually
 	lb := &LoadBalancer{
-		strategy:     strategy,
-		healthChecks: healthChecker,
+		strategy:         strategy,
+		healthChecks:     healthChecker,
+		metricsCollector: metrics.NewMetricsCollector(),
 	}
 
 	// Create a test request

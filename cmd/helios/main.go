@@ -23,6 +23,41 @@ func main() {
 		log.Fatalf("Failed to create load balancer: %v", err)
 	}
 
+	// Setup metrics server if enabled
+	if cfg.Metrics.Enabled {
+		metricsPort := cfg.Metrics.Port
+		if metricsPort == 0 {
+			metricsPort = 9090 // Default metrics port
+		}
+
+		metricsPath := cfg.Metrics.Path
+		if metricsPath == "" {
+			metricsPath = "/metrics" // Default metrics path
+		}
+
+		metricsCollector := lb.GetMetricsCollector()
+
+		// Create metrics server
+		metricsMux := http.NewServeMux()
+		metricsMux.HandleFunc(metricsPath, metricsCollector.MetricsHandler())
+		metricsMux.HandleFunc("/health", metricsCollector.HealthHandler())
+
+		metricsServer := &http.Server{
+			Addr:    fmt.Sprintf(":%d", metricsPort),
+			Handler: metricsMux,
+		}
+
+		// Start metrics server in background
+		go func() {
+			log.Printf("Metrics server starting on port %d", metricsPort)
+			log.Printf("Metrics endpoint: http://localhost:%d%s", metricsPort, metricsPath)
+			log.Printf("Health endpoint: http://localhost:%d/health", metricsPort)
+			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("Metrics server error: %v", err)
+			}
+		}()
+	}
+
 	// Setup HTTP server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{

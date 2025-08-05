@@ -9,7 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0xReLogic/Helios/internal/circuitbreaker"
 	"github.com/0xReLogic/Helios/internal/config"
+	"github.com/0xReLogic/Helios/internal/metrics"
+	"github.com/0xReLogic/Helios/internal/ratelimiter"
 )
 
 // Strategy defines the interface for load balancing strategies
@@ -47,10 +50,13 @@ type healthChecker struct {
 
 // LoadBalancer manages the backend servers and implements load balancing
 type LoadBalancer struct {
-	strategy     Strategy
-	mutex        sync.RWMutex
-	config       *config.Config
-	healthChecks *healthChecker
+	strategy         Strategy
+	mutex            sync.RWMutex
+	config           *config.Config
+	healthChecks     *healthChecker
+	rateLimiter      ratelimiter.RateLimiter
+	circuitBreaker   *circuitbreaker.CircuitBreaker
+	metricsCollector *metrics.MetricsCollector
 }
 
 // NewLoadBalancer creates a new load balancer with the specified strategy
@@ -86,9 +92,62 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 
 	// Create the load balancer
 	lb := &LoadBalancer{
-		strategy:     strategy,
-		config:       cfg,
-		healthChecks: healthChecks,
+		strategy:         strategy,
+		config:           cfg,
+		healthChecks:     healthChecks,
+		metricsCollector: metrics.NewMetricsCollector(),
+	}
+
+	// Setup rate limiting if enabled
+	if cfg.RateLimit.Enabled {
+		maxTokens := cfg.RateLimit.MaxTokens
+		if maxTokens <= 0 {
+			maxTokens = 100 // Default
+		}
+		refillRate := time.Duration(cfg.RateLimit.RefillRate) * time.Second
+		if refillRate <= 0 {
+			refillRate = time.Second // Default
+		}
+		lb.rateLimiter = ratelimiter.NewTokenBucketRateLimiter(maxTokens, refillRate)
+		log.Printf("Rate limiting enabled: %d tokens, refill every %v", maxTokens, refillRate)
+	}
+
+	// Setup circuit breaker if enabled
+	if cfg.CircuitBreaker.Enabled {
+		cbSettings := circuitbreaker.Settings{
+			Name:             "helios-lb",
+			MaxRequests:      uint32(cfg.CircuitBreaker.MaxRequests),
+			Interval:         time.Duration(cfg.CircuitBreaker.IntervalSeconds) * time.Second,
+			Timeout:          time.Duration(cfg.CircuitBreaker.TimeoutSeconds) * time.Second,
+			FailureThreshold: uint32(cfg.CircuitBreaker.FailureThreshold),
+			SuccessThreshold: uint32(cfg.CircuitBreaker.SuccessThreshold),
+			OnStateChange: func(name string, from circuitbreaker.State, to circuitbreaker.State) {
+				log.Printf("Circuit breaker %s state changed from %s to %s", name, from, to)
+				// Update metrics
+				failureCount, successCount, requestCount := lb.circuitBreaker.Counts()
+				lb.metricsCollector.UpdateCircuitBreakerState(name, to.String(), failureCount, successCount, requestCount)
+			},
+		}
+
+		// Set defaults if not provided
+		if cbSettings.MaxRequests == 0 {
+			cbSettings.MaxRequests = 1
+		}
+		if cbSettings.Interval == 0 {
+			cbSettings.Interval = time.Minute
+		}
+		if cbSettings.Timeout == 0 {
+			cbSettings.Timeout = time.Minute
+		}
+		if cbSettings.FailureThreshold == 0 {
+			cbSettings.FailureThreshold = 5
+		}
+		if cbSettings.SuccessThreshold == 0 {
+			cbSettings.SuccessThreshold = 1
+		}
+
+		lb.circuitBreaker = circuitbreaker.NewCircuitBreaker(cbSettings)
+		log.Printf("Circuit breaker enabled with failure threshold: %d", cbSettings.FailureThreshold)
 	}
 
 	// Add backends from configuration
@@ -217,7 +276,7 @@ func (lb *LoadBalancer) AddBackend(backendCfg config.BackendConfig) error {
 		Name:              backendCfg.Name,
 		URL:               backendURL,
 		ReverseProxy:      proxy,
-		IsHealthy:         true, // Assume healthy initially
+		IsHealthy:         true,        // Assume healthy initially
 		UnhealthyUntil:    time.Time{}, // Zero time means it's healthy
 		ActiveConnections: 0,
 		Weight:            weight,
@@ -300,15 +359,59 @@ func (backend *Backend) GetActiveConnections() int32 {
 	return atomic.LoadInt32(&backend.ActiveConnections)
 }
 
+// GetMetricsCollector returns the metrics collector
+func (lb *LoadBalancer) GetMetricsCollector() *metrics.MetricsCollector {
+	return lb.metricsCollector
+}
+
 // ServeHTTP implements the http.Handler interface
 func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+
+	// Record the request
+	lb.metricsCollector.RecordRequest()
+
+	// Check rate limiting if enabled
+	if lb.rateLimiter != nil {
+		clientIP := getClientIP(r)
+		if !lb.rateLimiter.Allow(clientIP) {
+			lb.metricsCollector.RecordRateLimitedRequest()
+			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+	}
+
+	// Execute request with circuit breaker protection if enabled
+	if lb.circuitBreaker != nil {
+		err := lb.circuitBreaker.Execute(func() error {
+			return lb.handleRequest(w, r, startTime)
+		})
+		if err != nil {
+			if err == circuitbreaker.ErrCircuitBreakerOpen {
+				http.Error(w, "Service temporarily unavailable", http.StatusServiceUnavailable)
+			} else if err == circuitbreaker.ErrTooManyRequests {
+				http.Error(w, "Too many requests", http.StatusTooManyRequests)
+			} else {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			lb.metricsCollector.RecordResponse(false, time.Since(startTime))
+			return
+		}
+	} else {
+		// Execute without circuit breaker
+		_ = lb.handleRequest(w, r, startTime)
+	}
+}
+
+// handleRequest handles the actual request processing
+func (lb *LoadBalancer) handleRequest(w http.ResponseWriter, r *http.Request, startTime time.Time) error {
 	// Find a healthy backend
 	var backend *Backend
 	for i := 0; i < 3; i++ { // Try up to 3 times to find a healthy backend
 		backend = lb.NextBackend(r)
 		if backend == nil {
 			http.Error(w, "No available backend servers", http.StatusServiceUnavailable)
-			return
+			return nil
 		}
 
 		// Check if the backend is healthy
@@ -323,11 +426,12 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// If we couldn't find a healthy backend after retries
 	if backend == nil || !lb.IsBackendHealthy(backend) {
 		http.Error(w, "No healthy backend servers available", http.StatusServiceUnavailable)
-		return
+		return nil
 	}
 
 	// Track the active connection
 	backend.IncrementConnections()
+	lb.metricsCollector.UpdateBackendConnections(backend.Name, backend.GetActiveConnections())
 
 	// Create a custom response writer to capture the status code
 	rw := &responseWriter{
@@ -340,6 +444,13 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Decrement the connection count when done
 	backend.DecrementConnections()
+	lb.metricsCollector.UpdateBackendConnections(backend.Name, backend.GetActiveConnections())
+
+	// Record metrics
+	responseTime := time.Since(startTime)
+	success := rw.statusCode < 500
+	lb.metricsCollector.RecordResponse(success, responseTime)
+	lb.metricsCollector.RecordBackendRequest(backend.Name, success, responseTime)
 
 	// Check if the backend returned an error status code (5xx) and passive health checks are enabled
 	if rw.statusCode >= 500 && lb.healthChecks.passiveEnabled {
@@ -361,7 +472,27 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			lb.healthChecks.unhealthyBackends[backend.Name] = 0
 			lb.healthChecks.unhealthyBackendMu.Unlock()
 		}
+
+		return circuitbreaker.ErrCircuitBreakerOpen // Return error for circuit breaker
 	}
+
+	return nil
+}
+
+// getClientIP extracts the client IP from the request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header first
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return xff
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
+	// Fall back to RemoteAddr
+	return r.RemoteAddr
 }
 
 // responseWriter is a custom ResponseWriter that captures the status code

@@ -17,7 +17,7 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "ip_hash"  # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
+  strategy: "weighted_round_robin"  # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
   
 health_checks:
   active:
@@ -29,3 +29,21 @@ health_checks:
     enabled: true
     unhealthy_threshold: 1  # Number of failures before marking as unhealthy
     unhealthy_timeout: 30   # Time in seconds to keep backend unhealthy
+
+rate_limit:
+  enabled: true
+  max_tokens: 100          # Maximum tokens in bucket
+  refill_rate_seconds: 1   # Refill rate in seconds
+
+circuit_breaker:
+  enabled: true
+  max_requests: 5          # Max requests in half-open state
+  interval_seconds: 60     # Time window for failure counting
+  timeout_seconds: 60      # Time to wait before moving from open to half-open
+  failure_threshold: 5     # Number of failures to open circuit
+  success_threshold: 2     # Number of successes to close circuit
+
+metrics:
+  enabled: true
+  port: 9090              # Port for metrics server
+  path: "/metrics"        # Path for metrics endpoint
