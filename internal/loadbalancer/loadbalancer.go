@@ -14,7 +14,7 @@ import (
 
 // Strategy defines the interface for load balancing strategies
 type Strategy interface {
-	NextBackend() *Backend
+	NextBackend(r *http.Request) *Backend
 	AddBackend(backend *Backend)
 	RemoveBackend(backend *Backend)
 	GetBackends() []*Backend
@@ -65,6 +65,8 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 		strategy = NewLeastConnectionsStrategy()
 	case "weighted_round_robin":
 		strategy = NewWeightedRoundRobinStrategy()
+	case "ip_hash":
+		strategy = NewIPHashStrategy()
 	default:
 		// Default to round robin if not specified
 		strategy = NewRoundRobinStrategy()
@@ -242,10 +244,10 @@ func (lb *LoadBalancer) RemoveBackend(name string) {
 }
 
 // NextBackend returns the next backend server according to the strategy
-func (lb *LoadBalancer) NextBackend() *Backend {
+func (lb *LoadBalancer) NextBackend(r *http.Request) *Backend {
 	lb.mutex.RLock()
 	defer lb.mutex.RUnlock()
-	return lb.strategy.NextBackend()
+	return lb.strategy.NextBackend(r)
 }
 
 // MarkBackendUnhealthy marks a backend as unhealthy for a specified duration
@@ -303,7 +305,7 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Find a healthy backend
 	var backend *Backend
 	for i := 0; i < 3; i++ { // Try up to 3 times to find a healthy backend
-		backend = lb.NextBackend()
+		backend = lb.NextBackend(r)
 		if backend == nil {
 			http.Error(w, "No available backend servers", http.StatusServiceUnavailable)
 			return

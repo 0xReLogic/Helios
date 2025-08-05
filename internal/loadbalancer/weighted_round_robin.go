@@ -1,6 +1,7 @@
 package loadbalancer
 
 import (
+	"net/http"
 	"sync"
 )
 
@@ -24,7 +25,7 @@ func NewWeightedRoundRobinStrategy() *WeightedRoundRobinStrategy {
 }
 
 // NextBackend returns the next backend using the smooth weighted round-robin algorithm.
-func (wrr *WeightedRoundRobinStrategy) NextBackend() *Backend {
+func (wrr *WeightedRoundRobinStrategy) NextBackend(r *http.Request) *Backend {
 	wrr.mutex.Lock()
 	defer wrr.mutex.Unlock()
 

@@ -1,6 +1,7 @@
 package loadbalancer
 
 import (
+	"net/http/httptest"
 	"net/url"
 	"testing"
 )
@@ -21,8 +22,9 @@ func TestWeightedRoundRobinStrategy(t *testing.T) {
 	iterations := totalWeight * 100                                  // 800
 
 	counts := make(map[string]int)
+	req := httptest.NewRequest("GET", "/", nil)
 	for i := 0; i < iterations; i++ {
-		backend := strategy.NextBackend()
+		backend := strategy.NextBackend(req)
 		if backend != nil {
 			counts[backend.Name]++
 		}
@@ -62,8 +64,9 @@ func TestWeightedRoundRobinStrategy_WithUnhealthyBackend(t *testing.T) {
 	iterations := totalWeight * 100                  // 600
 
 	counts := make(map[string]int)
+	req := httptest.NewRequest("GET", "/", nil)
 	for i := 0; i < iterations; i++ {
-		backend := strategy.NextBackend()
+		backend := strategy.NextBackend(req)
 		if backend != nil {
 			counts[backend.Name]++
 		}
@@ -90,7 +93,8 @@ func TestWeightedRoundRobinStrategy_WithUnhealthyBackend(t *testing.T) {
 
 func TestWeightedRoundRobinStrategy_NoBackends(t *testing.T) {
 	strategy := NewWeightedRoundRobinStrategy()
-	if strategy.NextBackend() != nil {
+	req := httptest.NewRequest("GET", "/", nil)
+	if strategy.NextBackend(req) != nil {
 		t.Error("Expected nil when no backends are available")
 	}
 }
@@ -104,7 +108,8 @@ func TestWeightedRoundRobinStrategy_AllUnhealthy(t *testing.T) {
 	strategy.AddBackend(backendA)
 	strategy.AddBackend(backendB)
 
-	if strategy.NextBackend() != nil {
+	req := httptest.NewRequest("GET", "/", nil)
+	if strategy.NextBackend(req) != nil {
 		t.Error("Expected nil when all backends are unhealthy")
 	}
 }
