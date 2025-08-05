@@ -140,7 +140,7 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "weighted_round_robin"  # Options: "round_robin", "least_connections", "weighted_round_robin"
+  strategy: "ip_hash"  # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
   
 health_checks:
   active:
@@ -180,6 +180,7 @@ Available strategies:
 - `round_robin`: Distributes requests sequentially across all healthy backends
 - `least_connections`: Routes to the backend with the fewest active connections
 - `weighted_round_robin`: Distributes requests based on backend weights. A backend with a higher weight will receive proportionally more requests.
+- `ip_hash`: Distributes requests based on a hash of the client's IP address. This ensures that a user will consistently be routed to the same backend server.
 
 #### Health Check Configuration
 
@@ -290,9 +291,9 @@ Contributions are welcome! Here's how you can contribute:
 
 ## Roadmap
 
-- [ ] Additional load balancing strategies
+- [x] Additional load balancing strategies
   - [x] Weighted Round Robin
-  - [ ] IP Hash
+  - [x] IP Hash
 - [ ] TLS/SSL support
 - [ ] Request rate limiting
 - [ ] Circuit breaker pattern implementation

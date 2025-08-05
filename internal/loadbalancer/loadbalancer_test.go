@@ -44,8 +44,9 @@ func TestRoundRobinStrategy(t *testing.T) {
 	// Test that we can get multiple backends in sequence
 	// Note: We don't test the exact order because the implementation might change
 	seen := make(map[string]bool)
+	req := httptest.NewRequest("GET", "/", nil)
 	for i := 0; i < 3; i++ {
-		backend := rr.NextBackend()
+		backend := rr.NextBackend(req)
 		if backend == nil {
 			t.Errorf("Expected a backend, got nil")
 		} else {
@@ -89,7 +90,8 @@ func TestLeastConnectionsStrategy(t *testing.T) {
 	lc.AddBackend(backend3)
 
 	// Test least connections selection - should select backend2 with fewest connections
-	selected := lc.NextBackend()
+	req := httptest.NewRequest("GET", "/", nil)
+	selected := lc.NextBackend(req)
 	if selected != backend2 {
 		t.Errorf("Expected backend2 with fewest connections, got %s", selected.Name)
 	}
@@ -100,7 +102,7 @@ func TestLeastConnectionsStrategy(t *testing.T) {
 	backend3.ActiveConnections = 2
 
 	// Now backend1 should be selected
-	selected = lc.NextBackend()
+	selected = lc.NextBackend(req)
 	if selected != backend1 {
 		t.Errorf("Expected backend1 with fewest connections, got %s", selected.Name)
 	}
@@ -219,7 +221,7 @@ type testStrategy struct {
 	index    int
 }
 
-func (ts *testStrategy) NextBackend() *Backend {
+func (ts *testStrategy) NextBackend(r *http.Request) *Backend {
 	if len(ts.backends) == 0 {
 		return nil
 	}

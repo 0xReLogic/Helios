@@ -1,6 +1,7 @@
 package loadbalancer
 
 import (
+	"net/http"
 	"sync"
 	"sync/atomic"
 )
@@ -21,7 +22,7 @@ func NewRoundRobinStrategy() *RoundRobinStrategy {
 }
 
 // NextBackend returns the next backend in the rotation
-func (rr *RoundRobinStrategy) NextBackend() *Backend {
+func (rr *RoundRobinStrategy) NextBackend(r *http.Request) *Backend {
 	rr.mutex.RLock()
 	defer rr.mutex.RUnlock()
 

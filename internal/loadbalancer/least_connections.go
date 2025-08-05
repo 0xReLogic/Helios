@@ -2,6 +2,7 @@ package loadbalancer
 
 import (
 	"math"
+	"net/http"
 	"sync"
 )
 
@@ -19,7 +20,7 @@ func NewLeastConnectionsStrategy() *LeastConnectionsStrategy {
 }
 
 // NextBackend returns the backend with the least active connections
-func (lc *LeastConnectionsStrategy) NextBackend() *Backend {
+func (lc *LeastConnectionsStrategy) NextBackend(r *http.Request) *Backend {
 	lc.mutex.RLock()
 	defer lc.mutex.RUnlock()
 
