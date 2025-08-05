@@ -551,15 +551,6 @@ Helios is designed for high performance and low resource usage:
 - **Efficient Resource Usage**: Low memory footprint and CPU utilization
 - **Concurrent Processing**: Leverages Go's goroutines for efficient parallel request handling
 
-### Benchmarks
-
-| Metric | Value |
-|--------|-------|
-| Requests per second | 10,000+ |
-| Average latency | < 2ms |
-| Memory usage | < 20MB |
-| CPU usage | < 10% on modern hardware |
-
 ## Advanced Usage
 
 ### Custom Health Check Endpoints
