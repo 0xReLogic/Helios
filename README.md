@@ -285,7 +285,7 @@ Contributions are welcome! Here's how you can contribute:
 
 ## Roadmap
 
-- [ ] Additional load balancing strategies (weighted round robin, IP hash)
+- [X] Additional load balancing strategies (weighted round robin, IP hash)
 - [ ] TLS/SSL support
 - [ ] Request rate limiting
 - [ ] Circuit breaker pattern implementation
