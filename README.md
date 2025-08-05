@@ -21,6 +21,8 @@ Helios is a lightweight, high-performance HTTP reverse proxy and load balancer d
 - **Advanced Load Balancing**: Multiple distribution strategies:
   - Round Robin - Distributes requests sequentially across all healthy backends
   - Least Connections - Routes to the backend with the fewest active connections
+  - Weighted Round Robin - Distributes requests based on user-assigned backend weights.
+  - IP Hash - Ensures requests from the same client IP are routed to the same backend.
 - **Intelligent Health Monitoring**:
   - Passive health checks - Detects failures from regular traffic patterns
   - Active health checks - Proactively monitors backend health with periodic requests
