@@ -6,7 +6,39 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 )
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all connections
+	},
+}
+
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Failed to upgrade to websocket: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	log.Println("WebSocket connection established")
+
+	for {
+		messageType, p, err := conn.ReadMessage()
+		if err != nil {
+			log.Printf("WebSocket read error: %v", err)
+			return
+		}
+		log.Printf("Received message: %s", p)
+		if err := conn.WriteMessage(messageType, p); err != nil {
+			log.Printf("WebSocket write error: %v", err)
+			return
+		}
+	}
+}
 
 func main() {
 	// No need to initialize random seed in Go 1.20+
@@ -55,6 +87,9 @@ func main() {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Manual failure triggered on Server %s", *serverID)
 	})
+
+	// Add a websocket echo endpoint
+	http.HandleFunc("/ws", handleWebSocket)
 
 	// Start server
 	addr := fmt.Sprintf(":%d", *port)
