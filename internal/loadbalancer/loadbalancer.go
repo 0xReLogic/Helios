@@ -402,7 +402,12 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Execute without circuit breaker
-		_ = lb.handleRequest(w, r, startTime)
+		if err := lb.handleRequest(w, r, startTime); err != nil {
+			// The handleRequest function already writes an error to the response writer.
+			// We just need to record the response metric here and log the error.
+			lb.metricsCollector.RecordResponse(false, time.Since(startTime))
+			log.Printf("Error handling request (circuit breaker disabled): %v", err)
+		}
 	}
 }
 
