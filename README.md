@@ -9,11 +9,11 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/0xReLogic/Helios/build.yml?branch=main)](https://github.com/0xReLogic/Helios/actions)
 </div>
 
-A high-performance, layer-7 HTTP reverse proxy and load balancer built with Go, designed for scalability and fault tolerance.
+Ultra-fast, production-grade L7 reverse proxy and load balancer for modern platforms — simple, extensible, and reliable.
 
 ## Overview
 
-Helios is a lightweight, high-performance HTTP reverse proxy and load balancer designed for modern microservice architectures. It provides intelligent traffic routing, health monitoring, and load distribution capabilities to ensure your services remain available and responsive under varying load conditions.
+Helios is a modern, production-grade reverse proxy and load balancer for microservices. It combines intelligent routing (Round Robin, Least Connections, Weighted, IP Hash), active/passive health checks, low-overhead WebSocket/TLS termination, runtime control via the Admin API, and a pluggable middleware system—delivering high throughput, low latency, and effortless operations.
 
 ## Features
 
