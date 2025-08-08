@@ -38,6 +38,8 @@ Helios is a lightweight, high-performance HTTP reverse proxy and load balancer d
 - **Configuration**: Simple YAML-based configuration
 - **Performance**: Low memory footprint and high throughput
 - **Reliability**: Automatic failover when backends become unhealthy
+- **Admin API**: Runtime backend management, strategy switching, and JSON metrics/health
+- **Plugin Middleware**: Configurable middleware chain (built-ins: logging, headers)
 
 ## Performance Benchmarks
 
@@ -356,6 +358,22 @@ metrics:
   enabled: true
   port: 9090              # Port for metrics server
   path: "/metrics"        # Path for metrics endpoint
+
+admin_api:
+  enabled: true
+  port: 9091
+  auth_token: "change-me"  # Optional; if set, protected endpoints require Bearer token
+
+plugins:
+  enabled: true
+  chain:
+    - name: logging
+    - name: headers
+      config:
+        set:
+          X-App: Helios
+        request_set:
+          X-From: LB
 ```
 
 ### Configuration Options
@@ -445,87 +463,94 @@ server:
 | `metrics.port` | Port for the metrics server | `9090` |
 | `metrics.path` | Path for the metrics endpoint | `/metrics` |
 
-## Testing
+#### Admin API Configuration
 
-### Testing Load Balancing
+| Option | Description | Default |
+|--------|-------------|---------|
+| `admin_api.enabled` | Enable Admin API | `false` |
+| `admin_api.port` | Port for the Admin API | `9091` |
+| `admin_api.auth_token` | Optional authentication token for protected endpoints | `disabled` |
 
-To test load balancing functionality:
+#### Plugin Middleware Configuration
 
-```bash
-# Send multiple requests to Helios
-for i in {1..10}; do curl -s http://localhost:8080; echo; done
+| Option | Description | Default |
+|--------|-------------|---------|
+| `plugins.enabled` | Enable plugin middleware | `false` |
+| `plugins.chain` | List of plugins to enable | `[]` |
+
+### Admin API
+
+Helios includes an Admin API for runtime control and observability.
+
+Configuration:
+
+```yaml
+admin_api:
+  enabled: true
+  port: 9091
+  auth_token: "change-me"  # Optional; if set, protected endpoints require Bearer token
 ```
 
-On Windows, you can use the provided batch script:
+Endpoints (default port 9091):
+- GET /v1/health — Admin API health (no auth required)
+- GET /v1/metrics — Metrics snapshot (requires auth if configured)
+- GET /v1/backends — List backends (protected)
+- POST /v1/backends/add — Add backend (protected)
+- POST /v1/backends/remove — Remove backend (protected)
+- POST /v1/strategy — Change strategy (protected)
+
+Examples:
 
 ```bash
-test_load_balancing.bat
+# Health (no auth)
+curl http://localhost:9091/v1/health
+
+# Metrics (with Bearer token)
+curl -H "Authorization: Bearer change-me" http://localhost:9091/v1/metrics
+
+# List backends
+curl -H "Authorization: Bearer change-me" http://localhost:9091/v1/backends
+
+# Add backend
+curl -X POST -H "Authorization: Bearer change-me" -H "Content-Type: application/json" \
+  -d '{"name":"b1","address":"http://127.0.0.1:8085","weight":1}' \
+  http://localhost:9091/v1/backends/add
+
+# Remove backend
+curl -X POST -H "Authorization: Bearer change-me" -H "Content-Type: application/json" \
+  -d '{"name":"b1"}' \
+  http://localhost:9091/v1/backends/remove
+
+# Switch strategy
+curl -X POST -H "Authorization: Bearer change-me" -H "Content-Type: application/json" \
+  -d '{"strategy":"least_connections"}' \
+  http://localhost:9091/v1/strategy
 ```
 
-### Testing Health Checks
+### Plugin Middleware
 
-To test health check functionality:
+Helios supports a configurable middleware chain. Built-in plugins:
+- `logging`: request/response logging with WebSocket support
+- `headers`: set static request/response headers
 
-```bash
-# Trigger a failure on a backend
-curl -s http://localhost:8082/fail
+Configuration example:
 
-# Send requests to Helios and observe that the failed backend is avoided
-for i in {1..5}; do curl -s http://localhost:8080; echo; done
+```yaml
+plugins:
+  enabled: true
+  chain:
+    - name: logging
+    - name: headers
+      config:
+        set:
+          X-App: Helios
+        request_set:
+          X-From: LB
 ```
 
-On Windows, you can use the provided batch script:
-
-```bash
-test_health_checks.bat
-```
-
-### Testing Rate Limiting
-
-To test rate limiting functionality:
-
-```bash
-# Send rapid requests to test rate limiting
-for i in {1..150}; do curl -s http://localhost:8080 && echo; done
-```
-
-You should see some requests return "Rate limit exceeded" with HTTP 429 status.
-
-### Testing Circuit Breaker
-
-To test circuit breaker functionality:
-
-```bash
-# Trigger failures on multiple backends
-curl -s http://localhost:8081/fail
-curl -s http://localhost:8082/fail
-curl -s http://localhost:8083/fail
-
-# Send requests to trigger circuit breaker
-for i in {1..10}; do curl -s http://localhost:8080; echo; done
-```
-
-### Monitoring and Metrics
-
-Access the metrics and health endpoints:
-
-```bash
-# View metrics
-curl http://localhost:9090/metrics
-
-# View health status
-curl http://localhost:9090/health
-```
-
-The metrics endpoint provides JSON data including:
-- Total requests and response times
-- Backend-specific metrics
-- Rate limiting statistics
-- Circuit breaker states
-- System uptime and performance data
+Order matters: plugins run top-to-bottom.
 
 ### Testing TLS/SSL
-
 To test TLS functionality, enable TLS in `helios.yaml`:
 
 ```yaml
@@ -604,8 +629,8 @@ Contributions are welcome! Here's how you can contribute:
 - [x] Circuit breaker pattern implementation
 - [x] Metrics and monitoring endpoints
 - [x] WebSocket support
-- [ ] Admin API for runtime configuration
-- [ ] Plugin system for custom middleware
+- [x] Admin API for runtime configuration
+- [x] Plugin system for custom middleware
 
 ## License
 

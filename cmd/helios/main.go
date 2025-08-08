@@ -7,7 +7,9 @@ import (
 	"os"
 
 	"github.com/0xReLogic/Helios/internal/config"
+	"github.com/0xReLogic/Helios/internal/adminapi"
 	"github.com/0xReLogic/Helios/internal/loadbalancer"
+	"github.com/0xReLogic/Helios/internal/plugins"
 )
 
 func main() {
@@ -58,11 +60,58 @@ func main() {
 		}()
 	}
 
+	// Setup Admin API server if enabled
+	if cfg.AdminAPI.Enabled {
+		adminPort := cfg.AdminAPI.Port
+		if adminPort == 0 {
+			adminPort = 9091 // Default admin port
+		}
+
+		mc := lb.GetMetricsCollector()
+		adminHandler := adminapi.NewMux(lb, cfg.AdminAPI.AuthToken, mc)
+		adminServer := &http.Server{
+			Addr:    fmt.Sprintf(":%d", adminPort),
+			Handler: adminHandler,
+		}
+
+		go func() {
+			log.Printf("Admin API server starting on port %d", adminPort)
+			if cfg.AdminAPI.AuthToken != "" {
+				log.Printf("Admin API authentication: Bearer token enabled")
+			} else {
+				log.Printf("Admin API authentication: disabled")
+			}
+			if err := adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("Admin API server error: %v", err)
+			}
+		}()
+	}
+
 	// Setup HTTP server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
+	// Base handler is the load balancer
+	var handler http.Handler = lb
+	// Apply plugin chain if enabled
+	if cfg.Plugins.Enabled && len(cfg.Plugins.Chain) > 0 {
+		chained, err := plugins.BuildChain(cfg.Plugins, handler)
+		if err != nil {
+			log.Fatalf("Failed to build plugin chain: %v", err)
+		}
+		handler = chained
+
+		// Log configured plugin names in order
+		names := make([]string, 0, len(cfg.Plugins.Chain))
+		for _, p := range cfg.Plugins.Chain {
+			names = append(names, p.Name)
+		}
+		log.Printf("Plugins enabled: %v", names)
+	} else {
+		log.Printf("Plugins disabled")
+	}
+
 	server := &http.Server{
 		Addr:    addr,
-		Handler: lb,
+		Handler: handler,
 	}
 
 	// Start server

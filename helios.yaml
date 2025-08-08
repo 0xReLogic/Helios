@@ -23,11 +23,11 @@ health_checks:
   active:
     enabled: true
     interval: 10  # Interval in seconds
-    timeout: 5    # Timeout in seconds
-    path: "/health"
+    timeout: 7    # Timeout in seconds
+    path: "/"
   passive:
     enabled: true
-    unhealthy_threshold: 1  # Number of failures before marking as unhealthy
+    unhealthy_threshold: 3  # Number of failures before marking as unhealthy
     unhealthy_timeout: 30   # Time in seconds to keep backend unhealthy
 
 rate_limit:
@@ -43,7 +43,23 @@ circuit_breaker:
   failure_threshold: 5     # Number of failures to open circuit
   success_threshold: 2     # Number of successes to close circuit
 
+admin_api:
+  enabled: true
+  port: 9091
+  auth_token: "change-me"
+
 metrics:
   enabled: true
   port: 9090              # Port for metrics server
   path: "/metrics"        # Path for metrics endpoint
+
+plugins:
+  enabled: true
+  chain:
+    - name: logging
+    - name: headers
+      config:
+        set:
+          X-App: Helios
+        request_set:
+          X-From: LB

@@ -16,6 +16,8 @@ type Config struct {
 	RateLimit      RateLimitConfig      `yaml:"rate_limit"`
 	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
 	Metrics        MetricsConfig        `yaml:"metrics"`
+	AdminAPI       AdminAPIConfig       `yaml:"admin_api"`
+	Plugins        PluginsConfig        `yaml:"plugins"`
 }
 
 // ServerConfig holds the server configuration
@@ -86,6 +88,25 @@ type MetricsConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Port    int    `yaml:"port"`
 	Path    string `yaml:"path"`
+}
+
+// AdminAPIConfig holds the Admin API configuration
+type AdminAPIConfig struct {
+	Enabled   bool   `yaml:"enabled"`
+	Port      int    `yaml:"port"`
+	AuthToken string `yaml:"auth_token,omitempty"`
+}
+
+// PluginConfig represents a single plugin in the chain
+type PluginConfig struct {
+	Name   string                 `yaml:"name"`
+	Config map[string]interface{} `yaml:"config,omitempty"`
+}
+
+// PluginsConfig holds plugin system configuration
+type PluginsConfig struct {
+	Enabled bool           `yaml:"enabled"`
+	Chain   []PluginConfig `yaml:"chain"`
 }
 
 // LoadConfig loads configuration from the specified YAML file

@@ -26,6 +26,67 @@ type Strategy interface {
 	GetBackends() []*Backend
 }
 
+// BackendInfo is a lightweight snapshot used by the Admin API
+type BackendInfo struct {
+	Name              string `json:"name"`
+	Address           string `json:"address"`
+	Healthy           bool   `json:"healthy"`
+	ActiveConnections int32  `json:"active_connections"`
+	Weight            int    `json:"weight"`
+}
+
+// ListBackends returns a snapshot of backends for the Admin API
+func (lb *LoadBalancer) ListBackends() []BackendInfo {
+    lb.mutex.RLock()
+    backends := lb.strategy.GetBackends()
+    lb.mutex.RUnlock()
+
+    infos := make([]BackendInfo, 0, len(backends))
+    for _, b := range backends {
+        b.Mutex.RLock()
+        info := BackendInfo{
+            Name:              b.Name,
+            Address:           b.URL.String(),
+            Healthy:           b.IsHealthy,
+            ActiveConnections: b.ActiveConnections,
+            Weight:            b.Weight,
+        }
+        b.Mutex.RUnlock()
+        infos = append(infos, info)
+    }
+    return infos
+}
+
+// SetStrategy switches the load balancing strategy at runtime
+func (lb *LoadBalancer) SetStrategy(name string) error {
+    lb.mutex.Lock()
+    defer lb.mutex.Unlock()
+
+    var newStrategy Strategy
+    switch name {
+    case "round_robin":
+        newStrategy = NewRoundRobinStrategy()
+    case "least_connections":
+        newStrategy = NewLeastConnectionsStrategy()
+    case "weighted_round_robin":
+        newStrategy = NewWeightedRoundRobinStrategy()
+    case "ip_hash":
+        newStrategy = NewIPHashStrategy()
+    default:
+        return fmt.Errorf("unknown strategy: %s", name)
+    }
+
+    // Move existing backends to the new strategy
+    for _, b := range lb.strategy.GetBackends() {
+        newStrategy.AddBackend(b)
+    }
+
+    lb.strategy = newStrategy
+    lb.config.LoadBalancer.Strategy = name
+    log.Printf("Load balancing strategy switched to %s", name)
+    return nil
+}
+
 // Backend represents a backend server
 type Backend struct {
 	Name              string
@@ -250,6 +311,11 @@ func (lb *LoadBalancer) checkBackendHealth(backend *Backend) {
 	backend.IsHealthy = true
 	backend.Mutex.Unlock()
 
+	// Update metrics to reflect healthy status
+	if lb.metricsCollector != nil {
+		lb.metricsCollector.UpdateBackendHealth(backend.Name, true)
+	}
+
 	if wasUnhealthy {
 		log.Printf("Backend %s is healthy again (active check)", backend.Name)
 	}
@@ -288,6 +354,11 @@ func (lb *LoadBalancer) AddBackend(backendCfg config.BackendConfig) error {
 	// Add to the strategy
 	lb.strategy.AddBackend(backend)
 
+	// Initialize metrics for backend health
+	if lb.metricsCollector != nil {
+		lb.metricsCollector.UpdateBackendHealth(backend.Name, backend.IsHealthy)
+	}
+
 	return nil
 }
 
@@ -320,6 +391,11 @@ func (lb *LoadBalancer) MarkBackendUnhealthy(backend *Backend, duration time.Dur
 	backend.IsHealthy = false
 	backend.UnhealthyUntil = time.Now().Add(duration)
 
+	// Update metrics to reflect unhealthy status
+	if lb.metricsCollector != nil {
+		lb.metricsCollector.UpdateBackendHealth(backend.Name, false)
+	}
+
 	log.Printf("Backend %s marked as unhealthy for %v", backend.Name, duration)
 }
 
@@ -337,6 +413,11 @@ func (lb *LoadBalancer) IsBackendHealthy(backend *Backend) bool {
 			backend.IsHealthy = true
 			backend.Mutex.Unlock()
 			backend.Mutex.RLock()
+
+			// Update metrics to reflect healthy status
+			if lb.metricsCollector != nil {
+				lb.metricsCollector.UpdateBackendHealth(backend.Name, true)
+			}
 
 			log.Printf("Backend %s is healthy again", backend.Name)
 			return true
