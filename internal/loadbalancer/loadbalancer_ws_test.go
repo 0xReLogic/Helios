@@ -85,7 +85,9 @@ func TestWebSocketProxy(t *testing.T) {
 	}
 
 	// 5. Read the echoed message
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatalf("Failed to set read deadline: %v", err)
+	}
 	_, p, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read message: %v", err)

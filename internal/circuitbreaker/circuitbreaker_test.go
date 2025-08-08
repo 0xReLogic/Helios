@@ -77,9 +77,11 @@ func TestCircuitBreakerHalfOpen(t *testing.T) {
 
 	// Generate failures to open the circuit
 	for i := 0; i < 2; i++ {
-		cb.Execute(func() error {
+		if err := cb.Execute(func() error {
 			return errors.New("failure")
-		})
+		}); err == nil {
+			t.Errorf("Request %d should have failed to open circuit", i+1)
+		}
 	}
 
 	// Wait for timeout
@@ -109,9 +111,11 @@ func TestCircuitBreakerMaxRequests(t *testing.T) {
 	})
 
 	// Open the circuit
-	cb.Execute(func() error {
+	if err := cb.Execute(func() error {
 		return errors.New("failure")
-	})
+	}); err == nil {
+		t.Fatalf("Expected failure to open circuit")
+	}
 
 	// Wait for timeout to move to half-open
 	time.Sleep(60 * time.Millisecond)
