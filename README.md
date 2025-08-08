@@ -9,7 +9,7 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/0xReLogic/Helios/build.yml?branch=main)](https://github.com/0xReLogic/Helios/actions)
 </div>
 
-Ultra-fast, production-grade L7 reverse proxy and load balancer for modern platforms — simple, extensible, and reliable.
+Ultra-fast, production-grade L7 reverse proxy and load balancer for modern platformssimple, extensible, and reliable.
 
 ## Overview
 
