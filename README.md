@@ -621,16 +621,36 @@ Contributions are welcome! Here's how you can contribute:
 
 ## Roadmap
 
-- [x] Additional load balancing strategies
-  - [x] Weighted Round Robin
-  - [x] IP Hash
-- [x] TLS/SSL support
-- [x] Request rate limiting
-- [x] Circuit breaker pattern implementation
-- [x] Metrics and monitoring endpoints
-- [x] WebSocket support
-- [x] Admin API for runtime configuration
-- [x] Plugin system for custom middleware
+- [ ] Hot reload and versioned config store (file + Admin API)
+- [ ] Admin API RBAC and scoped tokens
+- [ ] Runtime plugin management via Admin API (enable/disable/reorder, live config)
+- [ ] Plugin SDK and developer docs (examples and best practices)
+- [ ] Additional built-in plugins:
+  - [ ] JWT authentication
+  - [ ] CORS
+  - [ ] Gzip compression
+  - [ ] Request/response body size limits
+- [ ] Observability:
+  - [ ] Structured logging with trace/req IDs
+  - [ ] OpenTelemetry tracing
+  - [ ] Prometheus metrics exporter + Grafana dashboard
+- [ ] Advanced load balancing features:
+  - [ ] Sticky sessions
+  - [ ] Retries with backoff and per-route timeouts
+  - [ ] Outlier detection (passive health)
+  - [ ] HTTP/3 (QUIC) support
+- [ ] Security hardening:
+  - [ ] mTLS to backends
+  - [ ] IP allow/deny lists for Admin API
+- [ ] Routing enhancements:
+  - [ ] Path and header-based routing rules
+  - [ ] Weighted canary and blue/green deployments
+- [ ] Deployment & ops:
+  - [ ] Official Docker image and Helm chart
+  - [ ] Graceful shutdown and connection draining
+  - [ ] Zero-downtime reloads
+- [ ] Performance:
+  - [ ] Benchmarks and tuning guide
 
 ## License
 
