@@ -126,6 +126,23 @@ Helios demonstrates exceptional performance with **100% successful responses** u
 - **Graceful Degradation**: No failures even under maximum stress conditions
 - **Recovery Performance**: Quick return to optimal performance after load spikes
 
+### Resource Efficiency Analysis
+
+#### System Resource Usage (Comprehensive Testing)
+```
+=== Resource Usage Analysis ===
+CPU Usage - Avg: 45.5%, Max: 56.8%, Min: 36.4%
+Memory Usage - Avg: 3530MB, Max: 3581MB, Min: 3477MB
+Load Average - Avg: 14.97, Max: 18.16, Min: 6.59
+Total Samples: 51
+```
+
+#### Resource Efficiency Highlights
+- **Memory Footprint**: Stable 3.5GB usage during high-load operations
+- **CPU Utilization**: Efficient 45% average usage with headroom for scaling
+- **System Load**: Maintains healthy load averages under stress testing
+- **Resource Monitoring**: Complete metrics available in [resource_monitoring.csv](resource_monitoring.csv)
+
 ### Real-World Production Benefits
 
 #### Reliability & Trust
