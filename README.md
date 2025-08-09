@@ -333,9 +333,6 @@ plugins:
           X-App: Helios
         request_set:
           X-From: LB
-```
-          X-From: LB
-```
 
 ## Quick Start
 
