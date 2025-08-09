@@ -271,7 +271,7 @@ Helios is configured via `helios.yaml`:
 server:
   port: 8080
   tls:
-    enabled: false
+    enabled: true
     certFile: "certs/cert.pem"
     keyFile: "certs/key.pem"
 
@@ -301,8 +301,8 @@ health_checks:
     unhealthy_timeout: 15    # Time in seconds to keep backend unhealthy
 
 rate_limit:
-  enabled: false           # Disabled by default
-  max_tokens: 100000       # Maximum tokens in bucket
+  enabled: true            # Disabled by default
+  max_tokens: 100          # Maximum tokens in bucket
   refill_rate_seconds: 1   # Refill rate in seconds
 
 circuit_breaker:
@@ -333,6 +333,9 @@ plugins:
           X-App: Helios
         request_set:
           X-From: LB
+```
+          X-From: LB
+```
 
 ## Quick Start
 
@@ -417,5 +420,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-Made with ❤️ by <a href="https://github.com/0xReLogic">0xReLogic</a>
+Made with ❤️ by <a href="https://github.com/0xReLogic">Allen Elzayn</a>
 </div>
