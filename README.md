@@ -409,6 +409,39 @@ Access real-time metrics at `http://localhost:9090/metrics` (Prometheus format)
 - Passive: Request-based health tracking
 - Circuit breaker: Automatic failure isolation
 
+## Roadmap
+
+- [ ] Hot reload and versioned config store (file + Admin API)
+- [ ] Admin API RBAC and scoped tokens
+- [ ] Runtime plugin management via Admin API (enable/disable/reorder, live config)
+- [ ] Plugin SDK and developer docs (examples and best practices)
+- [ ] Additional built-in plugins:
+  - [ ] JWT authentication
+  - [ ] CORS
+  - [ ] Gzip compression
+  - [ ] Request/response body size limits
+- [ ] Observability:
+  - [ ] Structured logging with trace/req IDs
+  - [ ] OpenTelemetry tracing
+  - [ ] Prometheus metrics exporter + Grafana dashboard
+- [ ] Advanced load balancing features:
+  - [ ] Sticky sessions
+  - [ ] Retries with backoff and per-route timeouts
+  - [ ] Outlier detection (passive health)
+  - [ ] HTTP/3 (QUIC) support
+- [ ] Security hardening:
+  - [ ] mTLS to backends
+  - [ ] IP allow/deny lists for Admin API
+- [ ] Routing enhancements:
+  - [ ] Path and header-based routing rules
+  - [ ] Weighted canary and blue/green deployments
+- [ ] Deployment & ops:
+  - [ ] Official Docker image and Helm chart
+  - [ ] Graceful shutdown and connection draining
+  - [ ] Zero-downtime reloads
+- [ ] Performance:
+  - [ ] Benchmarks and tuning guide
+
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
