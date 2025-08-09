@@ -13,7 +13,7 @@ Ultra-fast, production-grade L7 reverse proxy and load balancer - simple, extens
 
 ## Overview
 
-Helios is a modern, production-grade reverse proxy and load balancer for microservices. It combines intelligent routing (Round Robin, Least Connections, Weighted, IP Hash), active/passive health checks, low-overhead WebSocket/TLS termination, runtime control via the Admin API, and a pluggable middleware system—delivering high throughput, low latency, and effortless operations.
+Helios is a modern, production-grade reverse proxy and load balancer for microservices. It combines intelligent routing (Round Robin, Least Connections, Weighted, IP Hash), active/passive health checks, low-overhead WebSocket/TLS termination, runtime control via the Admin API, and a pluggable middleware system delivering high throughput, low latency, and effortless operations.
 
 ## Features
 
