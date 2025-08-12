@@ -334,8 +334,6 @@ plugins:
         request_set:
           X-From: LB
 ```
-          X-From: LB
-```
 
 ## Quick Start
 
