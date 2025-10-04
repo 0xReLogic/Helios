@@ -129,3 +129,71 @@ func MyPluginFactory(name string, cfg map[string]interface{}) (Middleware, error
 }
 ```
 ---
+
+## 4. Tutorial : Building Your First Plugin
+
+Let's build a `request-id` plugin that adds a unique ID to every request and response.
+
+### Step 1: Create the Plugin File
+
+Create a new file: `internal/plugins/request_id.go`.
+
+### Step 2: Write the Plugin Code
+
+```go
+package plugins
+
+import (
+	"net/http"
+	"github.com/google/uuid"
+)
+
+func init() {
+	RegisterBuiltin("request-id", func(name string, cfg map[string]interface{}) (Middleware, error) {
+		// This plugin has no configuration, so the factory is simple.
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// 1. Generate a unique request ID
+				requestID := uuid.New().String()
+
+				// 2. Add the ID to the request header
+				r.Header.Set("X-Request-ID", requestID)
+
+				// 3. Add the ID to the response header
+				w.Header().Set("X-Request-ID", requestID)
+
+				// 4. Call the next handler in the chain
+				next.ServeHTTP(w, r)
+			})
+		}, nil
+	})
+}
+```
+
+### Code Walkthrough
+
+1.  **`init()`**: We register our plugin with the name `request-id`.
+2.  **Factory**: Our factory is simple because this plugin doesn't require configuration. It returns the middleware directly.
+3.  **Middleware**:
+    -   We generate a new UUID for each request.
+    -   We use `r.Header.Set` to add the ID to the incoming request.
+    -   We use `w.Header().Set` to add the same ID to the outgoing response.
+    -   Finally, we call `next.ServeHTTP` to continue the request chain.
+
+### Step 3: Add to Configuration
+
+Enable the plugin in your `helios.yaml`:
+
+```yaml
+plugins:
+  enabled: true
+  chain:
+    - name: request-id
+    - name: logging
+```
+
+### Step 4: Testing the Plugin
+
+Run Helios and make a request. You should see the `X-Request-ID` header in both the request received by your backend and the response received by the client.
+
+---
