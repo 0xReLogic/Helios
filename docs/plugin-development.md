@@ -45,3 +45,53 @@ Plugins are ideal for implementing features that are not specific to a single ba
 -   **Request/Response Transformation**: Add or remove headers, or modify the request path before forwarding.
 
 ---
+
+## 2. Getting Started
+
+### Plugin Interface Requirements
+
+A Helios plugin is a standard Go HTTP middleware created by a factory function.
+
+-   **Middleware Type (`plugins.Middleware`)**: A function that takes the next `http.Handler` in the chain and returns a new `http.Handler`.
+    ```go
+    type Middleware func(next http.Handler) http.Handler
+    ```
+-   **Factory Type (`plugins.factory`)**: A function that takes the plugin's name and configuration map and returns a `Middleware`.
+    ```go
+    type factory func(name string, cfg map[string]interface{}) (Middleware, error)
+    ```
+
+### Directory Structure
+
+All plugins reside in the `internal/plugins/` directory. To create a new plugin, add your file to this directory.
+
+```
+internal/
+└── plugins/
+    ├── headers.go
+    ├── logging.go
+    └── registry.go
+```
+
+You may use subdirectories in order to organize complex plugins. For exmaple, `internal/plugins/myplugin/`.
+
+### Configuration Schema
+
+Plugin configuration is managed in `helios.yaml` under the `plugins` key.
+
+-   `enabled` (boolean): Enables or disables the plugin system.
+-   `chain` (array): A list of plugin objects to execute in order.
+    -   `name` (string): The registered name of the plugin.
+    -   `config` (map, optional): Plugin-specific configuration (explained later).
+
+**Example `helios.yaml`:**
+```yaml
+plugins:
+  enabled: true
+  chain:
+    - name: headers
+      config:
+        set:
+          X-Powered-By: "Helios Gateway"
+    - name: logging
+```
