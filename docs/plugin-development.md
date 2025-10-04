@@ -95,3 +95,37 @@ plugins:
           X-Powered-By: "Helios Gateway"
     - name: logging
 ```
+
+## 3. Plugin API Reference
+
+### Plugin Interface Methods
+
+-   **`plugins.RegisterBuiltin(name string, f factory)`**: Registers a new plugin. This function should be called from the `init()` function of your plugin file.
+-   **`http.Handler.ServeHTTP(w http.ResponseWriter, r *http.Request)`**: The core method for handling requests. Your plugin will call `next.ServeHTTP(w, r)` to pass control to the next middleware.
+
+### Request/Response Context
+
+You can modify the request and response directly within your plugin:
+
+-   **Request**: Modify headers with `r.Header.Set("X-My-Header", "value")`.
+-   **Response**: Modify headers with `w.Header().Set("X-My-Header", "value")`. Note that response headers must be set *before* `next.ServeHTTP` is called if you want them to be available to downstream middleware.
+
+### Configuration Loading
+
+The `cfg map[string]interface{}` passed to your factory function contains the raw, unmarshaled configuration from `helios.yaml`. It is your responsibility to parse and validate this map.
+
+### Error Handling
+
+If your factory function encounters an invalid configuration, it should return an error. This will prevent Helios from starting and provide clear feedback to the user.
+
+```go
+func MyPluginFactory(name string, cfg map[string]interface{}) (Middleware, error) {
+    apiKey, ok := cfg["apiKey"].(string)
+    if !ok || apiKey == "" {
+        return nil, fmt.Errorf("apiKey is required for plugin %s", name)
+    }
+    // ...
+    return middleware, nil
+}
+```
+---
