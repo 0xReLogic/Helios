@@ -237,7 +237,7 @@ This approach allows plugins to implement complex logic requiring persistent dat
 
 ### Performance Considerations
 
-To ensure Helios plugins do not introduce significant latency or resource overhead, consider the following performance best practices:
+Although Helios is one of the fastest gateways in the market, you may consider these best practices to improve performance.
 
 *   **Avoid Blocking Operations**: Middleware functions execute synchronously in the request path. Avoid long-running or blocking operations (e.g., complex database queries, external API calls without timeouts) directly within the `http.HandlerFunc`. If such operations are necessary, consider offloading them.
 *   **Asynchronous Work with Goroutine Pools**: For tasks that can be performed asynchronously (e.g., sending logs to a remote service, non-critical metrics collection), use goroutines. To manage resource consumption and prevent unbounded goroutine creation, consider implementing or utilizing a goroutine pool.
@@ -246,4 +246,25 @@ To ensure Helios plugins do not introduce significant latency or resource overhe
     *   **Avoiding Unnecessary Copies**: Be mindful of data structures that might cause implicit copies.
 *   **Efficient `http.ResponseWriter` Wrapping**: When you need to inspect or modify the HTTP response (e.g., capture status codes or body content), you often need to wrap the `http.ResponseWriter`. The `internal/plugins/logging.go` plugin provides a good example of an efficient `statusRecorder` that wraps the `http.ResponseWriter` to capture the status code without excessive overhead, while also correctly implementing `http.Hijacker` and `http.Flusher` interfaces for compatibility.
 
-By adhering to these principles, you can build high-performance plugins that seamlessly integrate with the Helios Gateway.
+### Integration with Metrics (Future)
+
+Plugins will eventually have the ability to integrate with Helios's global metrics collector to emit custom metrics, providing deeper insights into plugin-specific behavior and performance. This allows for a unified observability strategy across the gateway and its extensions.
+
+The general pattern for integrating with metrics will involve:
+
+1.  **Importing the Metrics Package**:
+    ```go
+    import "github.com/0xReLogic/Helios/internal/metrics"
+    ```
+2.  **Accessing the Metrics Recorder**: Within your middleware, you would obtain a metrics recorder instance.
+    ```go
+    // In the middleware
+    recorder := metrics.GetRecorder() // if exposed
+    ```
+3.  **Emitting Metrics**: Use the recorder to increment counters, record histograms, or set gauges.
+    ```go
+    recorder.IncrementCounter("plugin_requests")
+    // recorder.ObserveHistogram("plugin_latency_ms", durationMs)
+    ```
+
+**Note**: At present, the metrics API is not directly exposed for plugin consumption. These are considered future integration points, and the exact API may evolve. This documentation serves to outline the intended pattern for when this functionality becomes available.
