@@ -234,3 +234,16 @@ func init() {
 ```
 
 This approach allows plugins to implement complex logic requiring persistent data across requests, such as rate limiting, authentication session tracking, or custom metrics collection.
+
+### Performance Considerations
+
+To ensure Helios plugins do not introduce significant latency or resource overhead, consider the following performance best practices:
+
+*   **Avoid Blocking Operations**: Middleware functions execute synchronously in the request path. Avoid long-running or blocking operations (e.g., complex database queries, external API calls without timeouts) directly within the `http.HandlerFunc`. If such operations are necessary, consider offloading them.
+*   **Asynchronous Work with Goroutine Pools**: For tasks that can be performed asynchronously (e.g., sending logs to a remote service, non-critical metrics collection), use goroutines. To manage resource consumption and prevent unbounded goroutine creation, consider implementing or utilizing a goroutine pool.
+*   **Minimize Allocations**: Go's garbage collector can introduce pauses. Reduce memory pressure by minimizing allocations within the hot path of your middleware. This includes:
+    *   **Reusing Buffers**: For I/O operations, reuse byte buffers where possible.
+    *   **Avoiding Unnecessary Copies**: Be mindful of data structures that might cause implicit copies.
+*   **Efficient `http.ResponseWriter` Wrapping**: When you need to inspect or modify the HTTP response (e.g., capture status codes or body content), you often need to wrap the `http.ResponseWriter`. The `internal/plugins/logging.go` plugin provides a good example of an efficient `statusRecorder` that wraps the `http.ResponseWriter` to capture the status code without excessive overhead, while also correctly implementing `http.Hijacker` and `http.Flusher` interfaces for compatibility.
+
+By adhering to these principles, you can build high-performance plugins that seamlessly integrate with the Helios Gateway.
