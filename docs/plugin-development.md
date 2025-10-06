@@ -197,3 +197,40 @@ plugins:
 Run Helios and make a request. You should see the `X-Request-ID` header in both the request received by your backend and the response received by the client.
 
 ---
+
+## 5. Advanced Topics
+
+### State Management
+
+Plugins can maintain state using Go closures within their factory functions. Variables declared in the factory's scope (outside the returned `Middleware` or `http.HandlerFunc`) are "closed over" and persist for the plugin instance's lifetime, accessible by all requests processed by that instance.
+
+**Key Considerations:**
+
+*   **Thread Safety**: When multiple concurrent requests access shared state, use synchronization primitives like `sync.Mutex` to prevent race conditions.
+*   **Cleanup**: For state that accumulates over time (e.g., request logs, caches), implement periodic cleanup mechanisms (e.g., a background goroutine with `time.Tick`) to manage memory usage.
+
+**Example: Simple Request Counter**
+
+This example demonstrates a basic request counter per remote IP address.
+
+```go
+func init() {
+    RegisterBuiltin("my-plugin", func(name string, cfg map[string]interface{}) (Middleware, error) {
+        // State stored in closure, protected by a mutex
+        var mu sync.Mutex
+        state := make(map[string]int) // Maps IP to request count
+        
+        return func(next http.Handler) http.Handler {
+            return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+                mu.Lock()
+                state[r.RemoteAddr]++ // Increment count for the client's IP
+                // Optionally, log or use the state for logic (e.g., rate limiting)
+                mu.Unlock()
+                next.ServeHTTP(w, r)
+            })
+        }, nil
+    })
+}
+```
+
+This approach allows plugins to implement complex logic requiring persistent data across requests, such as rate limiting, authentication session tracking, or custom metrics collection.
