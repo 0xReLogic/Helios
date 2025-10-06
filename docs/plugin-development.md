@@ -326,3 +326,5 @@ func TestMyPlugin(t *testing.T) {
 
 By following this pattern, you can write robust and isolated tests for your Helios plugins, ensuring they function correctly under various conditions and configurations.
 
+## 6. Example Plugins
+You can try out the example plugins in `examples/plugins` directory. 
