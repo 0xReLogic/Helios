@@ -11,7 +11,6 @@ import (
 func TestRequestIDPlugin(t *testing.T) {
 	var receivedRequestID string
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedRequestID = r.Header.Get("X-Request-ID")
 		if receivedRequestID == "" {
 			t.Error("expected X-Request-ID header in downstream request, but got empty")
 		}
