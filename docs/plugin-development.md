@@ -73,7 +73,7 @@ internal/
     └── registry.go
 ```
 
-You may use subdirectories in order to organize complex plugins. For exmaple, `internal/plugins/myplugin/`.
+You may use subdirectories in order to organize complex plugins. For example, `internal/plugins/myplugin/`.
 
 ### Configuration Schema
 
@@ -144,8 +144,10 @@ Create a new file: `internal/plugins/request_id.go`.
 package plugins
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"net/http"
-	"github.com/google/uuid"
 )
 
 func init() {
@@ -154,7 +156,14 @@ func init() {
 		return func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// 1. Generate a unique request ID
-				requestID := uuid.New().String()
+				b := make([]byte, 16)
+				if _, err := rand.Read(b); err != nil {
+					// Log the error and proceed without a request ID for this request
+					fmt.Printf("Error generating request ID: %v\n", err)
+					next.ServeHTTP(w, r)
+					return
+				}
+				requestID := hex.EncodeToString(b)
 
 				// 2. Add the ID to the request header
 				r.Header.Set("X-Request-ID", requestID)
@@ -327,4 +336,4 @@ func TestMyPlugin(t *testing.T) {
 By following this pattern, you can write robust and isolated tests for your Helios plugins, ensuring they function correctly under various conditions and configurations.
 
 ## 6. Example Plugins
-You can try out the example plugins in `examples/plugins` directory. 
+You can try out the example plugins in `examples/plugins` directory.

@@ -1,4 +1,4 @@
-package requestid
+package examples
 
 import (
 	"crypto/rand"
