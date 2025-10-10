@@ -42,7 +42,9 @@ func TestAuthenticationPlugin(t *testing.T) {
 			// 1. Create a mock backend handler
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("OK"))
+				if _, err := w.Write([]byte("OK")); err != nil {
+					t.Fatalf("failed to write response: %v", err)
+				}
 			})
 
 			// 2. Get the registered plugin factory from builtins map
