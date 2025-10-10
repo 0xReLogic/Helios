@@ -61,6 +61,34 @@ We welcome feature suggestions! Please create an issue with:
    go test ./...
    ```
 
+### Pre-Push Checklist
+
+Before pushing your changes, run these checks locally to catch issues early:
+
+```bash
+# Format code
+go fmt ./...
+
+# Run linter
+golangci-lint run
+
+# Run tests
+go test ./...
+
+# Build to ensure no compilation errors
+go build ./...
+```
+
+**Installing golangci-lint:**
+- macOS: `brew install golangci-lint`
+- Linux: `curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin`
+- Windows: `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
+
+Running these checks locally helps:
+- Catch linting and formatting issues before CI
+- Ensure tests pass before pushing
+- Speed up the review process
+
 ## Coding Standards
 
 - Follow Go best practices and style guidelines
