@@ -157,12 +157,13 @@ func init() {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// 1. Generate a unique request ID
 				b := make([]byte, 16)
-				if _, err := rand.Read(b); err != nil {
-					// Log the error and proceed without a request ID for this request
+                _, err := rand.Read(b)
+                if err != nil {
+                    // Log the error and proceed without a request ID for this request
 					fmt.Printf("Error generating request ID: %v\n", err)
 					next.ServeHTTP(w, r)
 					return
-				}
+                }
 				requestID := hex.EncodeToString(b)
 
 				// 2. Add the ID to the request header
