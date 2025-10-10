@@ -440,6 +440,10 @@ Access real-time metrics at `http://localhost:9090/metrics` (Prometheus format)
 - [ ] Performance:
   - [ ] Benchmarks and tuning guide
 
+## Documentation
+- [Plugin Development Guide](docs/plugin-development.md) - Learn how to create custom plugins
+  - Example plugins: `internal/plugins/examples`
+
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
