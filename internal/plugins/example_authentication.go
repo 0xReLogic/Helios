@@ -3,12 +3,10 @@ package plugins
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/0xReLogic/Helios/internal/plugins"
 )
 
 func init() {
-	plugins.RegisterBuiltin("custom-auth", func(name string, cfg map[string]interface{}) (plugins.Middleware, error) {
+	RegisterBuiltin("custom-auth", func(name string, cfg map[string]interface{}) (Middleware, error) {
 		apiKey, ok := cfg["apiKey"].(string)
 		if !ok || apiKey == "" {
 			return nil, fmt.Errorf("apiKey is required in config for %s plugin", name)

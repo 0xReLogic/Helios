@@ -4,12 +4,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
-
-	"github.com/0xReLogic/Helios/internal/plugins"
 )
 
 func init() {
-	plugins.RegisterBuiltin("request-id", func(name string, cfg map[string]interface{}) (plugins.Middleware, error) {
+	RegisterBuiltin("request-id", func(name string, cfg map[string]interface{}) (Middleware, error) {
 		return func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Generate a new UUID

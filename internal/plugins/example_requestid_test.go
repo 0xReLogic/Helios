@@ -17,7 +17,7 @@ func TestRequestIDPlugin(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	factory := plugins.builtins["request-id"]
+	factory := builtins["request-id"]
 	if factory == nil {
 		t.Fatal("request-id plugin not registered")
 	}

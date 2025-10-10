@@ -6,45 +6,32 @@ import (
 	"testing"
 )
 
-type Middleware func(next http.Handler) http.Handler
-type factory func(name string, cfg map[string]interface{}) (Middleware, error)
-
-func getAuthenticationMiddleware(name string, cfg map[string]interface{}) (Middleware, error) {
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			apiKey := r.Header.Get("X-API-Key")
-			if apiKey != "super-secret-key" {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}, nil
-}
-
 func TestAuthenticationPlugin(t *testing.T) {
 	tests := []struct {
 		name           string
 		apiKey         string
+		configAPIKey   string
 		expectedStatus int
 		expectedBody   string
 	}{
 		{
 			name:           "Valid API Key",
-			apiKey:         "super-secret-key",
+			apiKey:         "test-secret-key",
+			configAPIKey:   "test-secret-key",
 			expectedStatus: http.StatusOK,
 			expectedBody:   "OK",
 		},
 		{
 			name:           "Missing API Key",
 			apiKey:         "",
+			configAPIKey:   "test-secret-key",
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   "Unauthorized\n",
 		},
 		{
 			name:           "Invalid API Key",
 			apiKey:         "wrong-key",
+			configAPIKey:   "test-secret-key",
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   "Unauthorized\n",
 		},
@@ -52,25 +39,39 @@ func TestAuthenticationPlugin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// 1. Create a mock backend handler
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte("OK"))
 			})
 
-			mw, err := getAuthenticationMiddleware("custom-auth", nil)
+			// 2. Get the registered plugin factory from builtins map
+			factory := builtins["custom-auth"]
+			if factory == nil {
+				t.Fatal("custom-auth plugin not registered")
+			}
+
+			// 3. Create the middleware with test config
+			mw, err := factory("custom-auth", map[string]interface{}{
+				"apiKey": tt.configAPIKey,
+			})
 			if err != nil {
 				t.Fatalf("failed to create plugin middleware: %v", err)
 			}
 
+			// 4. Create test request
 			req := httptest.NewRequest("GET", "/test-path", nil)
 			if tt.apiKey != "" {
 				req.Header.Set("X-API-Key", tt.apiKey)
 			}
 
+			// 5. Record the response
 			rec := httptest.NewRecorder()
 
+			// 6. Execute the middleware
 			mw(handler).ServeHTTP(rec, req)
 
+			// 7. Assert the results
 			if rec.Code != tt.expectedStatus {
 				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
 			}
