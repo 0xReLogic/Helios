@@ -39,6 +39,7 @@ Helios is a modern, production-grade reverse proxy and load balancer for microse
 - **Performance**: Low memory footprint and high throughput
 - **Reliability**: Automatic failover when backends become unhealthy
 - **Admin API**: Runtime backend management, strategy switching, and JSON metrics/health
+- **Structured Logging**: Configurable JSON or text logs with request/trace identifiers
 - **Plugin Middleware**: Configurable middleware chain (built-ins: logging, headers)
 
 ## Performance Benchmarks
@@ -323,6 +324,17 @@ metrics:
   port: 9090              # Port for metrics server
   path: "/metrics"        # Path for metrics endpoint
 
+logging:
+  level: "info"           # debug, info, warn, error
+  format: "text"          # text (default) or json
+  include_caller: true    # include caller information in logs
+  request_id:
+    enabled: true
+    header: "X-Request-ID"
+  trace:
+    enabled: true
+    header: "X-Trace-ID"
+
 plugins:
   enabled: true
   chain:
@@ -336,6 +348,38 @@ plugins:
 ```
 
 ## Quick Start
+
+### Logging Configuration
+
+Helios emits structured logs using [zerolog](https://github.com/rs/zerolog) for efficient structured logging. Configure verbosity, output format, and observability headers via the `logging` block:
+
+- **level** – Supported values: `debug`, `info`, `warn`, `error` (default `info`).
+- **format** – `text` (default) for console readability or `json` for machine-friendly ingestion.
+- **include_caller** – When `true`, adds caller information to log entries.
+- **request_id** – Enables automatic generation and propagation of a request identifier. The value is attached to responses and forwarded to backends using the configured header (default `X-Request-ID`).
+- **trace** – Propagates distributed trace identifiers (default header `X-Trace-ID`) and includes them in every log entry.
+
+Each HTTP request is logged with latency, status code, backend target, and associated request/trace identifiers, simplifying correlation across services.
+
+#### Verifying request & trace propagation
+
+1. Start one or more sample backends:
+   ```bash
+   go run ./cmd/backend --port=8081 --id=server1
+   ```
+2. In a second terminal, run the load balancer (it picks up `helios.yaml`):
+   ```bash
+   go run ./cmd/helios
+   ```
+3. Issue a request and optionally provide your own trace identifier:
+   ```bash
+   curl -H "X-Trace-ID: trace_demo" http://localhost:8080/api/users
+   ```
+4. Observe the terminal output. With the default `text` format you will see entries similar to:
+   ```text
+   time=2025-10-02T10:30:00Z level=info request_id=req_abc123 trace_id=trace_demo method=GET path=/api/users status=200 latency_ms=45 backend=server1 message="request completed"
+   ```
+5. To compare against JSON logs, change `logging.format` to `json`, restart Helios, and repeat step 3—the output will be emitted as structured JSON for side-by-side comparison.
 
 ### Build and Run
 

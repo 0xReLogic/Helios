@@ -1,7 +1,6 @@
 package loadbalancer
 
 import (
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,7 +18,6 @@ func setupWebSocketTestBackend() *httptest.Server {
 		if r.URL.Path == "/ws" {
 			conn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				log.Printf("ws upgrade error: %v", err)
 				return
 			}
 			defer conn.Close()
@@ -97,5 +95,5 @@ func TestWebSocketProxy(t *testing.T) {
 		t.Errorf("Expected message '%s', but got '%s'", testMessage, string(p))
 	}
 
-	log.Println("WebSocket test successful!")
+	t.Log("WebSocket test successful!")
 }

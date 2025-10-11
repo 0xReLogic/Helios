@@ -9,15 +9,16 @@ import (
 
 // Config represents the main configuration structure for Helios
 type Config struct {
-	Server         ServerConfig         `yaml:"server"`
-	Backends       []BackendConfig      `yaml:"backends"`
-	LoadBalancer   LoadBalancerConfig   `yaml:"load_balancer"`
-	HealthChecks   HealthChecksConfig   `yaml:"health_checks"`
-	RateLimit      RateLimitConfig      `yaml:"rate_limit"`
-	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
-	Metrics        MetricsConfig        `yaml:"metrics"`
-	AdminAPI       AdminAPIConfig       `yaml:"admin_api"`
-	Plugins        PluginsConfig        `yaml:"plugins"`
+        Server         ServerConfig         `yaml:"server"`
+        Backends       []BackendConfig      `yaml:"backends"`
+        LoadBalancer   LoadBalancerConfig   `yaml:"load_balancer"`
+        HealthChecks   HealthChecksConfig   `yaml:"health_checks"`
+        RateLimit      RateLimitConfig      `yaml:"rate_limit"`
+        CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
+        Metrics        MetricsConfig        `yaml:"metrics"`
+        AdminAPI       AdminAPIConfig       `yaml:"admin_api"`
+        Plugins        PluginsConfig        `yaml:"plugins"`
+        Logging        LoggingConfig        `yaml:"logging"`
 }
 
 // ServerConfig holds the server configuration
@@ -105,8 +106,29 @@ type PluginConfig struct {
 
 // PluginsConfig holds plugin system configuration
 type PluginsConfig struct {
-	Enabled bool           `yaml:"enabled"`
-	Chain   []PluginConfig `yaml:"chain"`
+        Enabled bool           `yaml:"enabled"`
+        Chain   []PluginConfig `yaml:"chain"`
+}
+
+// LoggingConfig holds the structured logging configuration
+type LoggingConfig struct {
+        Level         string             `yaml:"level"`
+        Format        string             `yaml:"format"`
+        IncludeCaller bool               `yaml:"include_caller"`
+        RequestID     RequestIDConfig    `yaml:"request_id"`
+        Trace         TraceConfig        `yaml:"trace"`
+}
+
+// RequestIDConfig controls request identifier generation and propagation
+type RequestIDConfig struct {
+        Enabled bool   `yaml:"enabled"`
+        Header  string `yaml:"header"`
+}
+
+// TraceConfig controls distributed trace propagation
+type TraceConfig struct {
+        Enabled bool   `yaml:"enabled"`
+        Header  string `yaml:"header"`
 }
 
 // LoadConfig loads configuration from the specified YAML file
