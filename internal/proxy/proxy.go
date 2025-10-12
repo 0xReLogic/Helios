@@ -2,12 +2,12 @@ package proxy
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 
 	"github.com/0xReLogic/Helios/internal/config"
+	"github.com/0xReLogic/Helios/internal/logging"
 )
 
 // ReverseProxy represents the core reverse proxy functionality
@@ -32,11 +32,11 @@ func NewReverseProxy(cfg *config.Config) (*ReverseProxy, error) {
 
 	// Add custom error handler
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		log.Printf("Error proxying request: %v", err)
+		logging.WithContext(r.Context()).Error().Err(err).Msg("error proxying request")
 		w.WriteHeader(http.StatusBadGateway)
 		_, writeErr := w.Write([]byte("Backend server is not available"))
 		if writeErr != nil {
-			log.Printf("Error writing response: %v", writeErr)
+			logging.WithContext(r.Context()).Error().Err(writeErr).Msg("error writing proxy error response")
 		}
 	}
 
@@ -48,6 +48,6 @@ func NewReverseProxy(cfg *config.Config) (*ReverseProxy, error) {
 
 // ServeHTTP implements the http.Handler interface
 func (rp *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Proxying request: %s %s", r.Method, r.URL.Path)
+	logging.WithContext(r.Context()).Info().Str("method", r.Method).Str("path", r.URL.Path).Msg("proxying request")
 	rp.proxy.ServeHTTP(w, r)
 }

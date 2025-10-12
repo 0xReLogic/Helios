@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/0xReLogic/Helios/internal/config"
+	"github.com/0xReLogic/Helios/internal/logging"
 )
 
 var upgrader = websocket.Upgrader{
@@ -19,28 +21,31 @@ var upgrader = websocket.Upgrader{
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("Failed to upgrade to websocket: %v", err)
+		logging.WithContext(r.Context()).Error().Err(err).Msg("failed to upgrade to websocket")
 		return
 	}
 	defer conn.Close()
 
-	log.Println("WebSocket connection established")
+	logging.WithContext(r.Context()).Info().Msg("websocket connection established")
 
 	for {
 		messageType, p, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("WebSocket read error: %v", err)
+			logging.WithContext(r.Context()).Error().Err(err).Msg("websocket read error")
 			return
 		}
-		log.Printf("Received message: %s", p)
+		logging.WithContext(r.Context()).Info().Bytes("message", p).Msg("websocket message received")
 		if err := conn.WriteMessage(messageType, p); err != nil {
-			log.Printf("WebSocket write error: %v", err)
+			logging.WithContext(r.Context()).Error().Err(err).Msg("websocket write error")
 			return
 		}
 	}
 }
 
 func main() {
+	logging.Init(config.LoggingConfig{Format: "text"})
+	logger := logging.L()
+
 	// No need to initialize random seed in Go 1.20+
 	// rand.Seed is deprecated since Go 1.20
 
@@ -52,11 +57,12 @@ func main() {
 
 	// Define HTTP handler
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Backend %s received request: %s %s", *serverID, r.Method, r.URL.Path)
+		requestLogger := logging.WithContext(r.Context()).With().Str("backend", *serverID).Logger()
+		requestLogger.Info().Str("method", r.Method).Str("path", r.URL.Path).Msg("request received")
 
 		// Simulate random failures if fail-rate is set
 		if *failRate > 0 && (rand.Intn(100) < *failRate) {
-			log.Printf("Backend %s: Simulating a failure (status 500)", *serverID)
+			requestLogger.Warn().Msg("simulating failure")
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Simulated failure from Backend Server %s!\n", *serverID)
 			return
@@ -69,7 +75,7 @@ func main() {
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		// Simulate random failures if fail-rate is set
 		if *failRate > 0 && (rand.Intn(100) < *failRate) {
-			log.Printf("Backend %s: Health check failing (status 500)", *serverID)
+			logging.WithContext(r.Context()).Warn().Str("backend", *serverID).Msg("health check failing")
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Health check failed from Server %s", *serverID)
 			return
@@ -81,7 +87,7 @@ func main() {
 
 	// Add a fail endpoint for testing health checks
 	http.HandleFunc("/fail", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Backend %s: Manually failing for testing", *serverID)
+		logging.WithContext(r.Context()).Warn().Str("backend", *serverID).Msg("manual failure triggered")
 
 		// Return 500 error to trigger health check failure
 		w.WriteHeader(http.StatusInternalServerError)
@@ -93,8 +99,8 @@ func main() {
 
 	// Start server
 	addr := fmt.Sprintf(":%d", *port)
-	log.Printf("Backend server %s starting on port %d", *serverID, *port)
+	logger.Info().Str("backend", *serverID).Int("port", *port).Msg("backend server starting")
 	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatalf("Backend server %s failed: %v", *serverID, err)
+		logger.Fatal().Err(err).Str("backend", *serverID).Msg("backend server failed")
 	}
 }

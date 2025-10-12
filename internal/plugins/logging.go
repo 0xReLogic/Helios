@@ -2,10 +2,11 @@ package plugins
 
 import (
 	"bufio"
-	"log"
 	"net"
 	"net/http"
 	"time"
+
+	logging "github.com/0xReLogic/Helios/internal/logging"
 )
 
 // statusRecorder records HTTP status and bytes written
@@ -56,7 +57,13 @@ func init() {
 				if !rec.wroteHeader {
 					status = http.StatusOK
 				}
-				log.Printf("%s %s -> %d (%s)", r.Method, r.URL.Path, status, dur)
+				latencyMs := float64(dur) / float64(time.Millisecond)
+				logging.WithContext(r.Context()).Info().
+					Str("method", r.Method).
+					Str("path", r.URL.Path).
+					Int("status", status).
+					Float64("latency_ms", latencyMs).
+					Msg("plugin request log")
 			})
 		}, nil
 	})

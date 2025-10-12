@@ -3,7 +3,6 @@ package loadbalancer
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/0xReLogic/Helios/internal/circuitbreaker"
 	"github.com/0xReLogic/Helios/internal/config"
+	"github.com/0xReLogic/Helios/internal/logging"
 	"github.com/0xReLogic/Helios/internal/metrics"
 	"github.com/0xReLogic/Helios/internal/ratelimiter"
 )
@@ -37,54 +37,54 @@ type BackendInfo struct {
 
 // ListBackends returns a snapshot of backends for the Admin API
 func (lb *LoadBalancer) ListBackends() []BackendInfo {
-    lb.mutex.RLock()
-    backends := lb.strategy.GetBackends()
-    lb.mutex.RUnlock()
+	lb.mutex.RLock()
+	backends := lb.strategy.GetBackends()
+	lb.mutex.RUnlock()
 
-    infos := make([]BackendInfo, 0, len(backends))
-    for _, b := range backends {
-        b.Mutex.RLock()
-        info := BackendInfo{
-            Name:              b.Name,
-            Address:           b.URL.String(),
-            Healthy:           b.IsHealthy,
-            ActiveConnections: b.ActiveConnections,
-            Weight:            b.Weight,
-        }
-        b.Mutex.RUnlock()
-        infos = append(infos, info)
-    }
-    return infos
+	infos := make([]BackendInfo, 0, len(backends))
+	for _, b := range backends {
+		b.Mutex.RLock()
+		info := BackendInfo{
+			Name:              b.Name,
+			Address:           b.URL.String(),
+			Healthy:           b.IsHealthy,
+			ActiveConnections: b.ActiveConnections,
+			Weight:            b.Weight,
+		}
+		b.Mutex.RUnlock()
+		infos = append(infos, info)
+	}
+	return infos
 }
 
 // SetStrategy switches the load balancing strategy at runtime
 func (lb *LoadBalancer) SetStrategy(name string) error {
-    lb.mutex.Lock()
-    defer lb.mutex.Unlock()
+	lb.mutex.Lock()
+	defer lb.mutex.Unlock()
 
-    var newStrategy Strategy
-    switch name {
-    case "round_robin":
-        newStrategy = NewRoundRobinStrategy()
-    case "least_connections":
-        newStrategy = NewLeastConnectionsStrategy()
-    case "weighted_round_robin":
-        newStrategy = NewWeightedRoundRobinStrategy()
-    case "ip_hash":
-        newStrategy = NewIPHashStrategy()
-    default:
-        return fmt.Errorf("unknown strategy: %s", name)
-    }
+	var newStrategy Strategy
+	switch name {
+	case "round_robin":
+		newStrategy = NewRoundRobinStrategy()
+	case "least_connections":
+		newStrategy = NewLeastConnectionsStrategy()
+	case "weighted_round_robin":
+		newStrategy = NewWeightedRoundRobinStrategy()
+	case "ip_hash":
+		newStrategy = NewIPHashStrategy()
+	default:
+		return fmt.Errorf("unknown strategy: %s", name)
+	}
 
-    // Move existing backends to the new strategy
-    for _, b := range lb.strategy.GetBackends() {
-        newStrategy.AddBackend(b)
-    }
+	// Move existing backends to the new strategy
+	for _, b := range lb.strategy.GetBackends() {
+		newStrategy.AddBackend(b)
+	}
 
-    lb.strategy = newStrategy
-    lb.config.LoadBalancer.Strategy = name
-    log.Printf("Load balancing strategy switched to %s", name)
-    return nil
+	lb.strategy = newStrategy
+	lb.config.LoadBalancer.Strategy = name
+	logging.L().Info().Str("strategy", name).Msg("load balancing strategy switched")
+	return nil
 }
 
 // Backend represents a backend server
@@ -173,7 +173,7 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 			refillRate = time.Second // Default
 		}
 		lb.rateLimiter = ratelimiter.NewTokenBucketRateLimiter(maxTokens, refillRate)
-		log.Printf("Rate limiting enabled: %d tokens, refill every %v", maxTokens, refillRate)
+		logging.L().Info().Int("max_tokens", maxTokens).Dur("refill_rate", refillRate).Msg("rate limiting enabled")
 	}
 
 	// Setup circuit breaker if enabled
@@ -186,7 +186,7 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 			FailureThreshold: uint32(cfg.CircuitBreaker.FailureThreshold),
 			SuccessThreshold: uint32(cfg.CircuitBreaker.SuccessThreshold),
 			OnStateChange: func(name string, from circuitbreaker.State, to circuitbreaker.State) {
-				log.Printf("Circuit breaker %s state changed from %s to %s", name, from, to)
+				logging.L().Info().Str("circuit_breaker", name).Str("from", from.String()).Str("to", to.String()).Msg("circuit breaker state changed")
 				// Update metrics
 				failureCount, successCount, requestCount := lb.circuitBreaker.Counts()
 				lb.metricsCollector.UpdateCircuitBreakerState(name, to.String(), failureCount, successCount, requestCount)
@@ -211,7 +211,7 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 		}
 
 		lb.circuitBreaker = circuitbreaker.NewCircuitBreaker(cbSettings)
-		log.Printf("Circuit breaker enabled with failure threshold: %d", cbSettings.FailureThreshold)
+		logging.L().Info().Uint32("failure_threshold", cbSettings.FailureThreshold).Msg("circuit breaker enabled")
 	}
 
 	// Add backends from configuration
@@ -224,16 +224,15 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 	// Start active health checks in a background goroutine if enabled
 	if lb.healthChecks.activeEnabled {
 		go lb.startActiveHealthChecks()
-		log.Printf("Active health checks enabled with interval %v", lb.healthChecks.activeInterval)
+		logging.L().Info().Dur("interval", lb.healthChecks.activeInterval).Msg("active health checks enabled")
 	} else {
-		log.Printf("Active health checks disabled")
+		logging.L().Info().Msg("active health checks disabled")
 	}
 
 	if lb.healthChecks.passiveEnabled {
-		log.Printf("Passive health checks enabled with threshold %d and timeout %v",
-			lb.healthChecks.passiveThreshold, lb.healthChecks.passiveTimeout)
+		logging.L().Info().Int("threshold", lb.healthChecks.passiveThreshold).Dur("timeout", lb.healthChecks.passiveTimeout).Msg("passive health checks enabled")
 	} else {
-		log.Printf("Passive health checks disabled")
+		logging.L().Info().Msg("passive health checks disabled")
 	}
 
 	return lb, nil
@@ -244,7 +243,7 @@ func (lb *LoadBalancer) startActiveHealthChecks() {
 	ticker := time.NewTicker(lb.healthChecks.activeInterval)
 	defer ticker.Stop()
 
-	log.Printf("Starting active health checks with interval %v", lb.healthChecks.activeInterval)
+	logging.L().Info().Dur("interval", lb.healthChecks.activeInterval).Msg("starting active health checks")
 
 	// Run an initial health check immediately
 	lb.checkBackendsHealth()
@@ -279,7 +278,7 @@ func (lb *LoadBalancer) checkBackendHealth(backend *Backend) {
 
 	req, err := http.NewRequest("GET", healthURL.String(), nil)
 	if err != nil {
-		log.Printf("Error creating health check request for %s: %v", backend.Name, err)
+		logging.L().Error().Str("backend", backend.Name).Err(err).Msg("error creating health check request")
 		return
 	}
 
@@ -293,14 +292,14 @@ func (lb *LoadBalancer) checkBackendHealth(backend *Backend) {
 
 	// Check for errors or non-200 status codes
 	if err != nil {
-		log.Printf("Health check failed for %s: %v", backend.Name, err)
+		logging.L().Error().Str("backend", backend.Name).Err(err).Msg("health check failed")
 		lb.MarkBackendUnhealthy(backend, lb.healthChecks.passiveTimeout)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("Health check returned non-OK status for %s: %d", backend.Name, resp.StatusCode)
+		logging.L().Warn().Str("backend", backend.Name).Int("status", resp.StatusCode).Msg("health check returned non-ok status")
 		lb.MarkBackendUnhealthy(backend, lb.healthChecks.passiveTimeout)
 		return
 	}
@@ -317,7 +316,7 @@ func (lb *LoadBalancer) checkBackendHealth(backend *Backend) {
 	}
 
 	if wasUnhealthy {
-		log.Printf("Backend %s is healthy again (active check)", backend.Name)
+		logging.L().Info().Str("backend", backend.Name).Msg("backend marked healthy via active check")
 	}
 }
 
@@ -396,7 +395,7 @@ func (lb *LoadBalancer) MarkBackendUnhealthy(backend *Backend, duration time.Dur
 		lb.metricsCollector.UpdateBackendHealth(backend.Name, false)
 	}
 
-	log.Printf("Backend %s marked as unhealthy for %v", backend.Name, duration)
+	logging.L().Warn().Str("backend", backend.Name).Dur("unhealthy_for", duration).Msg("backend marked unhealthy")
 }
 
 // IsBackendHealthy checks if a backend is currently healthy
@@ -419,7 +418,7 @@ func (lb *LoadBalancer) IsBackendHealthy(backend *Backend) bool {
 				lb.metricsCollector.UpdateBackendHealth(backend.Name, true)
 			}
 
-			log.Printf("Backend %s is healthy again", backend.Name)
+			logging.L().Info().Str("backend", backend.Name).Msg("backend marked healthy")
 			return true
 		}
 		return false
@@ -451,6 +450,7 @@ func (lb *LoadBalancer) GetMetricsCollector() *metrics.MetricsCollector {
 // ServeHTTP implements the http.Handler interface
 func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
+	logger := logging.WithContext(r.Context())
 
 	// Record the request
 	lb.metricsCollector.RecordRequest()
@@ -460,6 +460,7 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		clientIP := getClientIP(r)
 		if !lb.rateLimiter.Allow(clientIP) {
 			lb.metricsCollector.RecordRateLimitedRequest()
+			logger.Warn().Str("client_ip", clientIP).Msg("request rate limited")
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
@@ -471,6 +472,7 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return lb.handleRequest(w, r, startTime)
 		})
 		if err != nil {
+			logger.Error().Err(err).Msg("circuit breaker execution failed")
 			if err == circuitbreaker.ErrCircuitBreakerOpen {
 				http.Error(w, "Service temporarily unavailable", http.StatusServiceUnavailable)
 			} else if err == circuitbreaker.ErrTooManyRequests {
@@ -483,7 +485,9 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Execute without circuit breaker
-		_ = lb.handleRequest(w, r, startTime)
+		if err := lb.handleRequest(w, r, startTime); err != nil {
+			logger.Error().Err(err).Msg("request handling failed")
+		}
 	}
 }
 
@@ -509,6 +513,7 @@ func (lb *LoadBalancer) handleRequest(w http.ResponseWriter, r *http.Request, st
 
 	// If we couldn't find a healthy backend after retries
 	if backend == nil || !lb.IsBackendHealthy(backend) {
+		logging.WithContext(r.Context()).Warn().Str("path", r.URL.Path).Msg("no healthy backend available")
 		http.Error(w, "No healthy backend servers available", http.StatusServiceUnavailable)
 		return nil
 	}
@@ -536,6 +541,8 @@ func (lb *LoadBalancer) handleRequest(w http.ResponseWriter, r *http.Request, st
 	lb.metricsCollector.RecordResponse(success, responseTime)
 	lb.metricsCollector.RecordBackendRequest(backend.Name, success, responseTime)
 
+	logger := logging.WithContext(r.Context())
+
 	// Check if the backend returned an error status code (5xx) and passive health checks are enabled
 	if rw.statusCode >= 500 && lb.healthChecks.passiveEnabled {
 		// Increment failure count for this backend
@@ -544,8 +551,11 @@ func (lb *LoadBalancer) handleRequest(w http.ResponseWriter, r *http.Request, st
 		failureCount := lb.healthChecks.unhealthyBackends[backend.Name]
 		lb.healthChecks.unhealthyBackendMu.Unlock()
 
-		log.Printf("Backend %s returned status %d (failure count: %d/%d)",
-			backend.Name, rw.statusCode, failureCount, lb.healthChecks.passiveThreshold)
+		logger.Warn().Str("backend", backend.Name).
+			Int("status", rw.statusCode).
+			Int("failure_count", failureCount).
+			Int("threshold", lb.healthChecks.passiveThreshold).
+			Msg("backend returned server error")
 
 		// If failure count exceeds threshold, mark as unhealthy
 		if failureCount >= lb.healthChecks.passiveThreshold {
@@ -559,6 +569,15 @@ func (lb *LoadBalancer) handleRequest(w http.ResponseWriter, r *http.Request, st
 
 		return circuitbreaker.ErrCircuitBreakerOpen // Return error for circuit breaker
 	}
+
+	latencyMs := float64(responseTime) / float64(time.Millisecond)
+	logger.Info().
+		Str("backend", backend.Name).
+		Str("method", r.Method).
+		Str("path", r.URL.Path).
+		Int("status", rw.statusCode).
+		Float64("latency_ms", latencyMs).
+		Msg("request completed")
 
 	return nil
 }
