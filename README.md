@@ -42,123 +42,6 @@ Helios is a modern, production-grade reverse proxy and load balancer for microse
 - **Structured Logging**: Configurable JSON or text logs with request/trace identifiers
 - **Plugin Middleware**: Configurable middleware chain (built-ins: logging, headers)
 
-## Performance Benchmarks
-
-### Test Environment
-- **Hardware**: GitHub Codespaces (AMD EPYC 7763 64-Core, 16GB RAM)
-- **Operating System**: Ubuntu 24.04.2 LTS
-- **Testing Tool**: wrk HTTP benchmarking tool
-- **Load Balancing Strategy**: Round Robin (optimized configuration)
-- **Go Version**: Latest stable release
-- **Network**: Cloud-grade infrastructure
-
-### Industry Comparison Results
-
-Comprehensive benchmarking against industry-standard load balancers demonstrates Helios's competitive performance in production environments.
-
-#### Load Balancer Performance Comparison
-| Load Balancer | RPS | Avg Latency | Technology | Performance |
-|---------------|-----|-------------|------------|-------------|
-| **Helios (Optimized)** | **6,745** | **30.72ms** | **Go** | **Beats Nginx** |
-| Nginx | 5,591 | 35.67ms | C | Industry Standard |
-| HAProxy | 15,869 | 13.00ms | C | Specialist |
-
-#### Key Performance Achievements
-- **Outperforms Nginx**: 20% higher throughput (6,745 vs 5,591 RPS)
-- **Superior Latency**: 14% faster response times (30.72ms vs 35.67ms)
-- **Go Runtime Efficiency**: Proves modern language performance capabilities
-- **Feature-Rich**: Includes circuit breaker, health checks, admin API unlike basic Nginx setup
-
-### Helios Performance Analysis
-
-#### Configuration Impact Testing
-| Configuration | Connections | RPS | Latency | Improvement | Status |
-|---------------|-------------|-----|---------|-------------|---------|
-| Default | 200 | 6,483 | 32.10ms | Baseline | Solid |
-| **Benchmark** | 200 | **6,745** | **30.72ms** | **+4.0%** | **Optimal** |
-| Ultra-Tuned | 200 | 6,625 | 31.41ms | +2.2% | Good |
-| High Load | 500 | 6,272 | 81.01ms | -3.3% | Resource Limit |
-
-#### Production Performance Characteristics
-- **Optimal Load**: 200-300 concurrent connections achieve peak performance
-- **Sustained Throughput**: 6,000+ RPS consistently maintained
-- **Runtime Efficiency**: Minimal tuning impact (4%) proves Go optimization
-- **Fault Tolerance**: Circuit breaker prevents cascade failures
-- **Memory Stable**: Consistent resource usage under load
-
-### Why Helios Delivers Excellence
-
-#### Go Language Advantages
-- **Modern Runtime**: Efficient garbage collection and goroutine scheduling
-- **Concurrent by Design**: Native support for thousands of simultaneous connections  
-- **Standard Library**: Production-grade HTTP handling with net/http package
-- **Memory Safety**: Automatic memory management prevents common C/C++ pitfalls
-- **Developer Productivity**: Fast development cycles with strong type safety
-
-#### Architecture Benefits
-- **Circuit Breaker Pattern**: Prevents cascading failures in microservice environments
-- **Health Check Intelligence**: Active and passive monitoring ensures backend reliability
-- **Multiple Load Balancing**: Round Robin, Least Connections, Weighted, IP Hash strategies
-- **Admin API**: Runtime configuration changes without service restarts
-- **Plugin System**: Extensible middleware for custom business logic
-
-#### Performance Engineering
-- **Optimized Configuration**: Benchmark config removes unnecessary overhead
-- **Connection Management**: Efficient backend connection pooling and reuse
-- **Request Processing**: Minimal allocation during request forwarding
-- **Error Handling**: Graceful degradation under high load conditions
-
-### Strategy Selection Guide
-
-Choose the optimal load balancing strategy based on your use case:
-
-#### Use IP Hash When:
-- **Session Affinity Required**: User sessions must stick to the same backend server
-- **Stateful Applications**: Applications that store user state locally on servers  
-- **Maximum Performance**: Achieve peak **10,092 RPS** with reliable performance (34.2ms median)
-- **Cache Optimization**: Maximize cache hit rates by routing users to same server
-- **WebSocket Connections**: Persistent connections that need server consistency
-
-#### Use Round Robin When:
-- **Equal Backend Capacity**: All backend servers have identical specifications
-- **Stateless Applications**: Applications that don't require session persistence
-- **Fair Load Distribution**: Perfect equal traffic distribution across backends
-- **Simple Configuration**: Want straightforward setup without weights or complexity
-- **Balanced Performance**: Achieve **8,234 RPS** with consistent load distribution
-
-#### Use Least Connections When:
-- **Variable Request Processing**: Backends handle requests with different processing times
-- **Dynamic Load Optimization**: Automatic routing to least busy servers
-- **Mixed Workloads**: Combination of fast and slow requests in your application
-- **High Concurrent Load**: Handle **8,847 RPS** with intelligent routing
-- **Auto Load Balancing**: Let the system automatically optimize traffic distribution
-
-#### Use Weighted Round Robin When:
-- **Different Backend Capacities**: Servers with varying CPU, memory, or processing power
-- **Gradual Traffic Migration**: Moving traffic between old and new infrastructure  
-- **Cost Optimization**: Route more traffic to powerful/expensive servers
-- **Capacity-Aware Routing**: Achieve **7,891 RPS** respecting server capabilities
-- **Precise Traffic Control**: Want exact control over traffic ratios (5:2:1 example)
-
-### Extreme Load Resilience
-
-Helios demonstrates exceptional resilience under extreme load conditions:
-
-#### 2000 Concurrent Connections Test (Real Edge Case Performance)
-- **Throughput**: 5,371 RPS sustained under extreme load (100% success rate)
-- **Total Requests**: 322,797 successful requests processed in 60 seconds
-- **System Stability**: No complete system failure even at maximum stress
-- **Data Transfer**: 50.18MB successfully transferred under brutal load
-- **Latency Resilience**: Maintained 364ms median latency under extreme conditions
-- **Enterprise Readiness**: Proves capability to handle Black Friday-level traffic spikes
-
-#### Performance Summary (Real Benchmarks - 100% Success Rate):
-- **Best for Maximum Throughput**: IP Hash (10,092 RPS)
-- **Best for Intelligent Routing**: Least Connections (8,847 RPS)
-- **Best for Equal Distribution**: Round Robin (8,234 RPS)
-- **Best for Capacity Awareness**: Weighted Round Robin (7,891 RPS)
-- **Best for Extreme Load**: All strategies survive 2000+ concurrent connections with zero failures
-
 ## Architecture
 
 ```mermaid
@@ -451,39 +334,6 @@ Access real-time metrics at `http://localhost:9090/metrics` (Prometheus format)
 - Passive: Request-based health tracking
 - Circuit breaker: Automatic failure isolation
 
-## Roadmap
-
-- [ ] Hot reload and versioned config store (file + Admin API)
-- [ ] Admin API RBAC and scoped tokens
-- [ ] Runtime plugin management via Admin API (enable/disable/reorder, live config)
-- [ ] Plugin SDK and developer docs (examples and best practices)
-- [ ] Additional built-in plugins:
-  - [ ] JWT authentication
-  - [ ] CORS
-  - [ ] Gzip compression
-  - [ ] Request/response body size limits
-- [ ] Observability:
-  - [ ] Structured logging with trace/req IDs
-  - [ ] OpenTelemetry tracing
-  - [ ] Prometheus metrics exporter + Grafana dashboard
-- [ ] Advanced load balancing features:
-  - [ ] Sticky sessions
-  - [ ] Retries with backoff and per-route timeouts
-  - [ ] Outlier detection (passive health)
-  - [ ] HTTP/3 (QUIC) support
-- [ ] Security hardening:
-  - [ ] mTLS to backends
-  - [ ] IP allow/deny lists for Admin API
-- [ ] Routing enhancements:
-  - [ ] Path and header-based routing rules
-  - [ ] Weighted canary and blue/green deployments
-- [ ] Deployment & ops:
-  - [ ] Official Docker image and Helm chart
-  - [ ] Graceful shutdown and connection draining
-  - [ ] Zero-downtime reloads
-- [ ] Performance:
-  - [ ] Benchmarks and tuning guide
-
 ## Documentation
 - [Plugin Development Guide](docs/plugin-development.md) - Learn how to create custom plugins
   - Example plugins: `internal/plugins/examples`
@@ -498,6 +348,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<div align="center">
-Made with ❤️ by <a href="https://github.com/0xReLogic">Allen Elzayn</a>
-</div>
+## Contributors
+
+Thanks to all the amazing people who have contributed to Helios! 
+
+<a href="https://github.com/0xReLogic/Helios/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=0xReLogic/Helios" />
+</a>
+
+
