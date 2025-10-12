@@ -42,10 +42,12 @@ func RequestContextMiddleware(cfg config.LoggingConfig) func(http.Handler) http.
 
 			logger := WithContext(ctx)
 			if requestID != "" {
-				logger = logger.With().Str("request_id", requestID).Logger()
+				enriched := logger.With().Str("request_id", requestID).Logger()
+				logger = &enriched
 			}
 			if traceID != "" {
-				logger = logger.With().Str("trace_id", traceID).Logger()
+				enriched := logger.With().Str("trace_id", traceID).Logger()
+				logger = &enriched
 			}
 
 			ctx = contextWithLogger(ctx, logger, requestID, traceID)

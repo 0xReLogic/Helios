@@ -15,7 +15,8 @@ import (
 func swapLoggerForTest(logger zerolog.Logger) func() {
 	baseLoggerMu.Lock()
 	previous := baseLogger
-	baseLogger = logger
+	copyLogger := logger
+	baseLogger = &copyLogger
 	baseLoggerMu.Unlock()
 	return func() {
 		baseLoggerMu.Lock()

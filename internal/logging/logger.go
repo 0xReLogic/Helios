@@ -32,7 +32,7 @@ const (
 )
 
 var (
-	baseLogger   zerolog.Logger
+	baseLogger   *zerolog.Logger
 	baseLoggerMu sync.RWMutex
 )
 
@@ -95,25 +95,31 @@ func newLogger(writer io.Writer, level zerolog.Level, format logFormat, includeC
 
 func setBaseLogger(logger zerolog.Logger) {
 	baseLoggerMu.Lock()
-	baseLogger = logger
+	baseLogger = &logger
 	baseLoggerMu.Unlock()
 }
 
 // L returns the base logger.
-func L() zerolog.Logger {
+func L() *zerolog.Logger {
 	baseLoggerMu.RLock()
 	logger := baseLogger
 	baseLoggerMu.RUnlock()
+	if logger == nil {
+		// Should not happen, but fall back to a sane default.
+		fallback := newLogger(os.Stdout, zerolog.InfoLevel, formatText, false)
+		setBaseLogger(fallback)
+		return L()
+	}
 	return logger
 }
 
 // WithContext returns a logger enriched with request scoped metadata.
-func WithContext(ctx context.Context) zerolog.Logger {
+func WithContext(ctx context.Context) *zerolog.Logger {
 	if ctx == nil {
 		return L()
 	}
 
-	if logger, ok := ctx.Value(loggerKey).(zerolog.Logger); ok {
+	if logger, ok := ctx.Value(loggerKey).(*zerolog.Logger); ok && logger != nil {
 		return logger
 	}
 
@@ -131,7 +137,7 @@ func WithContext(ctx context.Context) zerolog.Logger {
 		builder = builder.Str("trace_id", traceID)
 	}
 	logger := builder.Logger()
-	return logger
+	return &logger
 }
 
 // RequestIDFromContext extracts the request identifier from context if present.
@@ -174,11 +180,11 @@ func TraceHeaderName(cfg config.LoggingConfig) string {
 	return header
 }
 
-func contextWithLogger(ctx context.Context, logger zerolog.Logger, reqID, traceID string) context.Context {
+func contextWithLogger(ctx context.Context, logger *zerolog.Logger, reqID, traceID string) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if logger != (zerolog.Logger{}) {
+	if logger != nil {
 		ctx = context.WithValue(ctx, loggerKey, logger)
 	}
 	if reqID != "" {
