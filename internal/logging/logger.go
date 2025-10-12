@@ -88,7 +88,7 @@ func newLogger(writer io.Writer, level zerolog.Level, format logFormat, includeC
 
 	builder := zerolog.New(output).Level(level).With().Timestamp()
 	if includeCaller {
-		builder = builder.CallerWithSkipFrameCount(3)
+		builder = builder.CallerWithSkipFrameCount(1)
 	}
 	return builder.Logger()
 }
