@@ -1,9 +1,108 @@
 package plugins
 
 import (
+	"bufio"
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"net"
 	"net/http"
+	"strconv"
 )
+
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	statusCode   int
+	wroteHeader  bool
+	minSize      int
+	level        int
+	contentTypes []string
+
+	buf bytes.Buffer
+}
+
+func (g *gzipResponseWriter) WriteHeader(code int) {
+	if g.wroteHeader {
+		return
+	}
+
+	g.statusCode = code
+	g.wroteHeader = true
+	g.ResponseWriter.WriteHeader(code)
+}
+
+func (g *gzipResponseWriter) Write(b []byte) (int, error) {
+	return g.buf.Write(b)
+}
+
+func (g *gzipResponseWriter) Flush() {
+	if f, ok := g.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (g *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := g.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, fmt.Errorf("underlying ResponseWriter does not support hijacking")
+}
+
+func (g *gzipResponseWriter) Finish() error {
+	if !g.wroteHeader {
+		g.WriteHeader(http.StatusOK)
+	}
+
+	body := g.buf.Bytes()
+
+	clHeader := g.Header().Get("Content-Length")
+	if clHeader != "" {
+		cl, err := strconv.Atoi(clHeader)
+		// if Content-Length header found and is less than the minSize then return the body as is.
+		if err == nil && cl < g.minSize {
+			_, err := g.ResponseWriter.Write(body)
+			return err
+		}
+	}
+
+	// acts as a fallback when Content-Length is not available.
+	if len(body) < g.minSize {
+		_, err := g.ResponseWriter.Write(body)
+		return err
+	}
+
+	// return body as is when Content-Type doesn't match specified in Config
+	ct := g.Header().Get("Content-Type")
+	if !matchesContentType(ct, g.contentTypes) {
+		_, err := g.ResponseWriter.Write(body)
+		return err
+	}
+
+	g.Header().Set("Content-Encoding", "gzip")
+	g.Header().Del("Content-Length")
+
+	gz, err := gzip.NewWriterLevel(g.ResponseWriter, g.level)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+
+	_, err = gz.Write(body)
+	if err != nil {
+		return err
+	}
+
+	return gz.Close()
+}
+
+func matchesContentType(ct string, allowed []string) bool {
+	for _, a := range allowed {
+		if len(ct) >= len(a) && ct[:len(a)] == a {
+			return true
+		}
+	}
+	return false
+}
 
 func parseGzipConfig(cfg map[string]interface{}) (int, int, []string, error) {
 	// numbers are unmarshalled into float64 by default
@@ -58,7 +157,19 @@ func init() {
 		return func(next http.Handler) http.Handler {
 
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				next.ServeHTTP(w, r)
+				grw := &gzipResponseWriter{
+					ResponseWriter: w,
+					level:          level,
+					minSize:        minSize,
+					contentTypes:   contentTypes,
+				}
+
+				next.ServeHTTP(grw, r)
+
+				err := grw.Finish()
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
 
 			})
 		}, nil
