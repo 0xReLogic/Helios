@@ -164,6 +164,161 @@ func TestGzipCompression(t *testing.T) {
 	}
 }
 
+func BenchmarkGzipResponseTime(b *testing.B) {
+	// Setup a large compressible body
+	compressibleBody := []byte(largeBody)
+	handlerType := "application/json"
+
+	// Create a mock backend handler
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", handlerType)
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write(compressibleBody); err != nil {
+			b.Fatalf("failed to write response: %v", err)
+		}
+	})
+
+	// Get the registered plugin factory from builtins map
+	factory := builtins["gzip"]
+	if factory == nil {
+		b.Fatal("gzip plugin not registered")
+	}
+
+	// Create the middleware with compression enabled
+	mwCompressed, err := factory("gzip", map[string]interface{}{
+		"level":         float64(gzip.DefaultCompression),
+		"min_size":      float64(10), // Small min_size to ensure compression
+		"content_types": convertStringsToInterfaces([]string{"application/json"}),
+	})
+	if err != nil {
+		b.Fatalf("failed to create compressed plugin middleware: %v", err)
+	}
+
+	// Create a middleware with compression effectively disabled (large min_size)
+	mwUncompressed, err := factory("gzip", map[string]interface{}{
+		"level":         float64(gzip.DefaultCompression),
+		"min_size":      float64(len(compressibleBody) + 1), // Larger than body to prevent compression
+		"content_types": convertStringsToInterfaces([]string{"application/json"}),
+	})
+	if err != nil {
+		b.Fatalf("failed to create uncompressed plugin middleware: %v", err)
+	}
+
+	b.Run("Compressed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			req := httptest.NewRequest("GET", "/test-path", nil)
+			req.Header.Set("Accept-Encoding", "gzip")
+			rec := httptest.NewRecorder()
+			mwCompressed(handler).ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				b.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+			}
+			if rec.Header().Get("Content-Encoding") != "gzip" {
+				b.Fatalf("expected Content-Encoding: gzip header, got %q", rec.Header().Get("Content-Encoding"))
+			}
+		}
+	})
+
+	b.Run("Uncompressed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			req := httptest.NewRequest("GET", "/test-path", nil)
+			// No Accept-Encoding or min_size too large
+			rec := httptest.NewRecorder()
+			mwUncompressed(handler).ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				b.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+			}
+			if rec.Header().Get("Content-Encoding") != "" {
+				b.Fatalf("expected no Content-Encoding header, got %q", rec.Header().Get("Content-Encoding"))
+			}
+		}
+	})
+}
+
+func BenchmarkGzipCompressionRatio(b *testing.B) {
+	tests := []struct {
+		name        string
+		body        []byte
+		contentType string
+	}{
+		{
+			name:        "Large JSON",
+			body:        []byte(largeBody),
+			contentType: "application/json",
+		},
+		{
+			name:        "Large HTML",
+			body:        []byte(`<!DOCTYPE html><html><body><h1>Hello, World!</h1><p>This is a sample HTML page for testing compression ratios. It contains some repetitive text to ensure good compression. This is a sample HTML page for testing compression ratios. It contains some repetitive text to ensure good compression. This is a sample HTML page for testing compression ratios. It contains some repetitive text to ensure good compression.</p></body></html>`),
+			contentType: "text/html",
+		},
+		{
+			name:        "Small Text",
+			body:        []byte(smallBody),
+			contentType: "text/plain",
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			// Create a mock backend handler
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", tt.contentType)
+				w.WriteHeader(http.StatusOK)
+				if _, err := w.Write(tt.body); err != nil {
+					b.Fatalf("failed to write response: %v", err)
+				}
+			})
+
+			// Get the registered plugin factory from builtins map
+			factory := builtins["gzip"]
+			if factory == nil {
+				b.Fatal("gzip plugin not registered")
+			}
+
+			// Create the middleware with compression enabled
+			mwCompressed, err := factory("gzip", map[string]interface{}{
+				"level":         float64(gzip.DefaultCompression),
+				"min_size":      float64(10), // Small min_size to ensure compression
+				"content_types": convertStringsToInterfaces([]string{tt.contentType}),
+			})
+			if err != nil {
+				b.Fatalf("failed to create compressed plugin middleware: %v", err)
+			}
+
+			var originalSize int64
+			var compressedSize int64
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				req := httptest.NewRequest("GET", "/test-path", nil)
+				req.Header.Set("Accept-Encoding", "gzip")
+				rec := httptest.NewRecorder()
+				mwCompressed(handler).ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusOK {
+					b.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+				}
+
+				if rec.Header().Get("Content-Encoding") == "gzip" {
+					originalSize = int64(len(tt.body))
+					compressedSize = int64(len(rec.Body.Bytes()))
+				} else {
+					originalSize = int64(len(tt.body))
+					compressedSize = int64(len(rec.Body.Bytes()))
+				}
+			}
+			b.StopTimer()
+
+			if originalSize > 0 {
+				ratio := float64(compressedSize) / float64(originalSize)
+				b.ReportMetric(ratio, "ratio")
+				b.ReportMetric(float64(originalSize), "original_bytes")
+				b.ReportMetric(float64(compressedSize), "compressed_bytes")
+			}
+		})
+	}
+}
+
 // Helper to convert []string to []interface{} for plugin config
 func convertStringsToInterfaces(s []string) []interface{} {
 	if s == nil {
