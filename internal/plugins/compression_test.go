@@ -157,6 +157,17 @@ func TestGzipCompression(t *testing.T) {
 			expectedStatus:     http.StatusOK,
 			expectCompression:  false,
 			expectedBody:       largeBody,
+		}, {
+			name:               "No Accept-Encoding header (should not compress)",
+			handlerBody:        largeBody,
+			handlerType:        ContentTypeJSON,
+			configLevel:        gzip.DefaultCompression,
+			configMinSize:      10,
+			configContentTypes: []string{ContentTypeJSON},
+			acceptEncoding:     "",
+			expectedStatus:     http.StatusOK,
+			expectCompression:  false,
+			expectedBody:       largeBody,
 		},
 	}
 

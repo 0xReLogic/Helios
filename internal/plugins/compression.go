@@ -155,8 +155,12 @@ func init() {
 			return nil, err
 		}
 		return func(next http.Handler) http.Handler {
-
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !shouldCompress(r) {
+					next.ServeHTTP(w, r)
+					return
+				}
+
 				grw := &gzipResponseWriter{
 					ResponseWriter: w,
 					level:          level,
@@ -170,8 +174,28 @@ func init() {
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 				}
-
 			})
 		}, nil
 	})
+}
+
+func shouldCompress(r *http.Request) bool {
+	return containsGzip(r.Header.Get("Accept-Encoding"))
+}
+
+func containsGzip(acceptEncoding string) bool {
+	for _, v := range splitAndTrim(acceptEncoding, ",") {
+		if v == "gzip" {
+			return true
+		}
+	}
+	return false
+}
+
+func splitAndTrim(s, sep string) []string {
+	var result []string
+	for _, part := range bytes.Split([]byte(s), []byte(sep)) {
+		result = append(result, string(bytes.TrimSpace(part)))
+	}
+	return result
 }
