@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -172,7 +173,7 @@ func init() {
 
 				err := grw.Finish()
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					log.Printf("gzip middleware: failed to write compressed response: %v", err)
 				}
 			})
 		}, nil
