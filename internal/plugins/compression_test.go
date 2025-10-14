@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"bytes"
 	"compress/gzip"
 	"io"
 	"net/http"
@@ -11,6 +12,83 @@ import (
 const largeBody = `{"message": "This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large."}`
 
 const smallBody = `{"message": "small"}`
+
+func newGzipMiddleware(t *testing.T, level, minSize int, contentTypes []string) Middleware {
+	t.Helper()
+
+	factory := builtins["gzip"]
+	if factory == nil {
+		t.Fatal("gzip plugin not registered")
+	}
+
+	mw, err := factory("gzip", map[string]interface{}{
+		"level":         float64(level),
+		"min_size":      float64(minSize),
+		"content_types": convertStringsToInterfaces(contentTypes),
+	})
+	if err != nil {
+		t.Fatalf("failed to create plugin middleware: %v", err)
+	}
+
+	return mw
+}
+
+func decompressBody(t *testing.T, data []byte) string {
+	t.Helper()
+
+	gzr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer gzr.Close()
+
+	decompressedBody, err := io.ReadAll(gzr)
+	if err != nil {
+		t.Fatalf("failed to decompress body: %v", err)
+	}
+
+	return string(decompressedBody)
+}
+
+func assertCompressed(t *testing.T, rec *httptest.ResponseRecorder, expectedBody string) {
+	// Assert: Response header Content-Encoding: gzip exists.
+	if rec.Header().Get("Content-Encoding") != "gzip" {
+		t.Errorf("expected Content-Encoding: gzip header, got %q", rec.Header().Get("Content-Encoding"))
+	}
+
+	// Assert: Body is smaller than original.
+	if len(rec.Body.Bytes()) >= len([]byte(expectedBody)) {
+		t.Errorf("expected compressed body length (%d) to be smaller than original (%d)", len(rec.Body.Bytes()), len([]byte(expectedBody)))
+	}
+
+	// Assert: Decompressing the body yields the original content.
+	decompressedBody := decompressBody(t, rec.Body.Bytes())
+
+	if string(decompressedBody) != expectedBody {
+		t.Errorf("decompressed body mismatch: expected %q, got %q", expectedBody, string(decompressedBody))
+	}
+}
+
+func assertUncompressed(t *testing.T, rec *httptest.ResponseRecorder, expectedBody string) {
+	if rec.Header().Get("Content-Encoding") != "" {
+		t.Errorf("expected no Content-Encoding header, got %q", rec.Header().Get("Content-Encoding"))
+	}
+
+	// Assert: Body is uncompressed (identical to original).
+	if rec.Body.String() != expectedBody {
+		t.Errorf("expected body %q, got %q", expectedBody, rec.Body.String())
+	}
+}
+
+func newMockHandler(t *testing.T, handlerType, handlerBody string) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", handlerType)
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(handlerBody)); err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
+	})
+}
 
 func TestGzipCompression(t *testing.T) {
 	tests := []struct {
@@ -79,85 +157,29 @@ func TestGzipCompression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 1. Create a mock backend handler
-			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", tt.handlerType)
-				w.WriteHeader(http.StatusOK)
-				if _, err := w.Write([]byte(tt.handlerBody)); err != nil {
-					t.Fatalf("failed to write response: %v", err)
-				}
-			})
+			handler := newMockHandler(t, tt.handlerType, tt.handlerBody)
 
-			// 2. Get the registered plugin factory from builtins map
-			factory := builtins["gzip"]
-			if factory == nil {
-				t.Fatal("gzip plugin not registered")
-			}
+			mw := newGzipMiddleware(t, tt.configLevel, tt.configMinSize, tt.configContentTypes)
 
-			// 3. Create the middleware with test config
-			mw, err := factory("gzip", map[string]interface{}{
-				"level":         float64(tt.configLevel),
-				"min_size":      float64(tt.configMinSize),
-				"content_types": convertStringsToInterfaces(tt.configContentTypes),
-			})
-			if err != nil {
-				t.Fatalf("failed to create plugin middleware: %v", err)
-			}
-
-			// 4. Create test request
 			req := httptest.NewRequest("GET", "/test-path", nil)
 			if tt.acceptEncoding != "" {
 				req.Header.Set("Accept-Encoding", tt.acceptEncoding)
 			}
 
-			// 5. Record the response
 			rec := httptest.NewRecorder()
 
-			// 6. Execute the middleware
 			mw(handler).ServeHTTP(rec, req)
 
-			// 7. Assert the results
 			if rec.Code != tt.expectedStatus {
 				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
 			}
 
+			expectedBody := tt.handlerBody
 			if tt.expectCompression {
-				// Assert: Response header Content-Encoding: gzip exists.
-				if rec.Header().Get("Content-Encoding") != "gzip" {
-					t.Errorf("expected Content-Encoding: gzip header, got %q", rec.Header().Get("Content-Encoding"))
-				}
-
-				// Assert: Body is smaller than original.
-				if len(rec.Body.Bytes()) >= len([]byte(tt.handlerBody)) {
-					t.Errorf("expected compressed body length (%d) to be smaller than original (%d)", len(rec.Body.Bytes()), len([]byte(tt.handlerBody)))
-				}
-
-				// Assert: Decompressing the body yields the original content.
-				gzr, err := gzip.NewReader(rec.Body)
-				if err != nil {
-					t.Fatalf("failed to create gzip reader: %v", err)
-				}
-				defer gzr.Close()
-
-				decompressedBody, err := io.ReadAll(gzr)
-				if err != nil {
-					t.Fatalf("failed to decompress body: %v", err)
-				}
-
-				if string(decompressedBody) != tt.handlerBody {
-					t.Errorf("decompressed body mismatch: expected %q, got %q", tt.handlerBody, string(decompressedBody))
-				}
-			} else {
-				// Assert: No Content-Encoding header.
-				if rec.Header().Get("Content-Encoding") != "" {
-					t.Errorf("expected no Content-Encoding header, got %q", rec.Header().Get("Content-Encoding"))
-				}
-
-				// Assert: Body is uncompressed (identical to original).
-				if rec.Body.String() != tt.expectedBody {
-					t.Errorf("expected body %q, got %q", tt.expectedBody, rec.Body.String())
-				}
+				assertCompressed(t, rec, expectedBody)
+				return
 			}
+			assertUncompressed(t, rec, expectedBody)
 		})
 	}
 }
