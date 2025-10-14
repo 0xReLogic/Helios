@@ -248,7 +248,7 @@ func BenchmarkGzipResponseTime(b *testing.B) {
 }
 
 func BenchmarkGzipCompressionRatio(b *testing.B) {
-	tests := []struct {
+	benchmarks := []struct {
 		name        string
 		body        []byte
 		contentType string
@@ -270,11 +270,11 @@ func BenchmarkGzipCompressionRatio(b *testing.B) {
 		},
 	}
 
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			handler := newMockHandler(b, tt.contentType, string(tt.body))
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			handler := newMockHandler(b, bm.contentType, string(bm.body))
 
-			mwCompressed := newGzipMiddleware(b, int(gzip.DefaultCompression), int(10), []string{tt.contentType})
+			mwCompressed := newGzipMiddleware(b, int(gzip.DefaultCompression), int(10), []string{bm.contentType})
 
 			var originalSize int64
 			var compressedSize int64
@@ -286,17 +286,10 @@ func BenchmarkGzipCompressionRatio(b *testing.B) {
 				rec := httptest.NewRecorder()
 				mwCompressed(handler).ServeHTTP(rec, req)
 
-				if rec.Code != http.StatusOK {
-					b.Fatalf(ExpectedStatusError, http.StatusOK, rec.Code)
-				}
+				assertStatusOk(b, rec.Code)
 
-				if rec.Header().Get("Content-Encoding") == "gzip" {
-					originalSize = int64(len(tt.body))
-					compressedSize = int64(len(rec.Body.Bytes()))
-				} else {
-					originalSize = int64(len(tt.body))
-					compressedSize = int64(len(rec.Body.Bytes()))
-				}
+				originalSize = int64(len(bm.body))
+				compressedSize = int64(len(rec.Body.Bytes()))
 			}
 			b.StopTimer()
 
