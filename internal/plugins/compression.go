@@ -114,8 +114,9 @@ func parseGzipConfig(cfg map[string]interface{}) (int, int, []string, error) {
 		return 0, 0, nil, fmt.Errorf("expected level for gzip config")
 	}
 	level := int(levelFloat)
-	if level < 1 || level > 9 {
-		return 0, 0, nil, fmt.Errorf("compression level must be between 1 and 9, got %d", level)
+	// Allow -1 (DefaultCompression), 0 (NoCompression), or 1-9
+	if level < -1 || level > 9 {
+		return 0, 0, nil, fmt.Errorf("compression level must be between -1 and 9, got %d", level)
 	}
 
 	minSizeFloat, ok := cfg["min_size"].(float64)
