@@ -8,10 +8,8 @@ import (
 	"testing"
 )
 
-// largeBody is a string larger than typical min_size for compression tests.
 const largeBody = `{"message": "This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large."}`
 
-// smallBody is a string smaller than typical min_size for compression tests.
 const smallBody = `{"message": "small"}`
 
 func TestGzipCompression(t *testing.T) {
@@ -25,7 +23,7 @@ func TestGzipCompression(t *testing.T) {
 		acceptEncoding     string
 		expectedStatus     int
 		expectCompression  bool
-		expectedBody       string // Only used if no compression is expected
+		expectedBody       string
 	}{
 		// A. Basic Compression
 		{
