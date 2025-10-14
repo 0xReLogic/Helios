@@ -5,10 +5,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
+
+	logging "github.com/0xReLogic/Helios/internal/logging"
 )
 
 type gzipResponseWriter struct {
@@ -80,6 +81,7 @@ func (g *gzipResponseWriter) Finish() error {
 	}
 
 	g.Header().Set("Content-Encoding", "gzip")
+	// Remove Content-Length since compressed size differs from original
 	g.Header().Del("Content-Length")
 
 	gz, err := gzip.NewWriterLevel(g.ResponseWriter, g.level)
@@ -112,6 +114,9 @@ func parseGzipConfig(cfg map[string]interface{}) (int, int, []string, error) {
 		return 0, 0, nil, fmt.Errorf("expected level for gzip config")
 	}
 	level := int(levelFloat)
+	if level < 1 || level > 9 {
+		return 0, 0, nil, fmt.Errorf("compression level must be between 1 and 9, got %d", level)
+	}
 
 	minSizeFloat, ok := cfg["min_size"].(float64)
 	if !ok {
@@ -173,7 +178,7 @@ func init() {
 
 				err := grw.Finish()
 				if err != nil {
-					log.Printf("gzip middleware: failed to write compressed response: %v", err)
+					logging.WithContext(r.Context()).Error().Err(err).Msg("gzip middleware: failed to write compressed response")
 				}
 			})
 		}, nil
