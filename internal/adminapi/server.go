@@ -3,12 +3,12 @@ package adminapi
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/0xReLogic/Helios/internal/config"
 	"github.com/0xReLogic/Helios/internal/loadbalancer"
+	"github.com/0xReLogic/Helios/internal/logging"
 	"github.com/0xReLogic/Helios/internal/metrics"
 )
 
@@ -126,6 +126,6 @@ func NewMux(lb *loadbalancer.LoadBalancer, token string, mc *metrics.MetricsColl
 		_, _ = w.Write([]byte("updated"))
 	})))
 
-	log.Println("Admin API mux initialized")
+	logging.L().Info().Msg("admin api mux initialized")
 	return mux
 }

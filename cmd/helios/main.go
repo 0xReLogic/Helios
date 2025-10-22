@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
-	"github.com/0xReLogic/Helios/internal/config"
 	"github.com/0xReLogic/Helios/internal/adminapi"
+	"github.com/0xReLogic/Helios/internal/config"
 	"github.com/0xReLogic/Helios/internal/loadbalancer"
+	"github.com/0xReLogic/Helios/internal/logging"
 	"github.com/0xReLogic/Helios/internal/plugins"
 )
 
@@ -16,13 +16,16 @@ func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig("helios.yaml")
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		logging.L().Fatal().Err(err).Msg("failed to load configuration")
 	}
+
+	logging.Init(cfg.Logging)
+	logger := logging.L()
 
 	// Create load balancer
 	lb, err := loadbalancer.NewLoadBalancer(cfg)
 	if err != nil {
-		log.Fatalf("Failed to create load balancer: %v", err)
+		logger.Fatal().Err(err).Msg("failed to create load balancer")
 	}
 
 	// Setup metrics server if enabled
@@ -51,11 +54,11 @@ func main() {
 
 		// Start metrics server in background
 		go func() {
-			log.Printf("Metrics server starting on port %d", metricsPort)
-			log.Printf("Metrics endpoint: http://localhost:%d%s", metricsPort, metricsPath)
-			log.Printf("Health endpoint: http://localhost:%d/health", metricsPort)
+			logger.Info().Int("port", metricsPort).Str("path", metricsPath).Msg("metrics server starting")
+			logger.Info().Int("port", metricsPort).Str("url", fmt.Sprintf("http://localhost:%d%s", metricsPort, metricsPath)).Msg("metrics endpoint")
+			logger.Info().Int("port", metricsPort).Str("url", fmt.Sprintf("http://localhost:%d/health", metricsPort)).Msg("metrics health endpoint")
 			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("Metrics server error: %v", err)
+				logger.Error().Err(err).Msg("metrics server error")
 			}
 		}()
 	}
@@ -75,14 +78,14 @@ func main() {
 		}
 
 		go func() {
-			log.Printf("Admin API server starting on port %d", adminPort)
+			logger.Info().Int("port", adminPort).Msg("admin api server starting")
 			if cfg.AdminAPI.AuthToken != "" {
-				log.Printf("Admin API authentication: Bearer token enabled")
+				logger.Info().Msg("admin api authentication enabled")
 			} else {
-				log.Printf("Admin API authentication: disabled")
+				logger.Info().Msg("admin api authentication disabled")
 			}
 			if err := adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("Admin API server error: %v", err)
+				logger.Error().Err(err).Msg("admin api server error")
 			}
 		}()
 	}
@@ -95,7 +98,7 @@ func main() {
 	if cfg.Plugins.Enabled && len(cfg.Plugins.Chain) > 0 {
 		chained, err := plugins.BuildChain(cfg.Plugins, handler)
 		if err != nil {
-			log.Fatalf("Failed to build plugin chain: %v", err)
+			logger.Fatal().Err(err).Msg("failed to build plugin chain")
 		}
 		handler = chained
 
@@ -104,10 +107,12 @@ func main() {
 		for _, p := range cfg.Plugins.Chain {
 			names = append(names, p.Name)
 		}
-		log.Printf("Plugins enabled: %v", names)
+		logger.Info().Strs("plugins", names).Msg("plugins enabled")
 	} else {
-		log.Printf("Plugins disabled")
+		logger.Info().Msg("plugins disabled")
 	}
+
+	handler = logging.RequestContextMiddleware(cfg.Logging)(handler)
 
 	server := &http.Server{
 		Addr:    addr,
@@ -115,57 +120,57 @@ func main() {
 	}
 
 	// Start server
-	log.Printf("Helios load balancer starting on port %d", cfg.Server.Port)
-	log.Printf("Load balancing strategy: %s", cfg.LoadBalancer.Strategy)
-	log.Printf("Backend servers:")
+	logger.Info().Int("port", cfg.Server.Port).Msg("helios load balancer starting")
+	logger.Info().Str("strategy", cfg.LoadBalancer.Strategy).Msg("load balancing strategy")
+	logger.Info().Msg("configured backend servers")
 	for _, backend := range cfg.Backends {
-		log.Printf("  - %s (%s)", backend.Name, backend.Address)
+		logger.Info().Str("backend", backend.Name).Str("address", backend.Address).Msg("backend registered")
 	}
 
 	// Log health check configuration
-	log.Printf("Health check configuration:")
+	logger.Info().Msg("health check configuration")
 	if cfg.HealthChecks.Active.Enabled {
-		log.Printf("  - Active health checks: Enabled (interval: %ds, timeout: %ds, path: %s)",
-			cfg.HealthChecks.Active.Interval,
-			cfg.HealthChecks.Active.Timeout,
-			cfg.HealthChecks.Active.Path)
+		logger.Info().Int("interval_seconds", cfg.HealthChecks.Active.Interval).
+			Int("timeout_seconds", cfg.HealthChecks.Active.Timeout).
+			Str("path", cfg.HealthChecks.Active.Path).
+			Msg("active health checks enabled")
 	} else {
-		log.Printf("  - Active health checks: Disabled")
+		logger.Info().Msg("active health checks disabled")
 	}
 
 	if cfg.HealthChecks.Passive.Enabled {
-		log.Printf("  - Passive health checks: Enabled (threshold: %d, timeout: %ds)",
-			cfg.HealthChecks.Passive.UnhealthyThreshold,
-			cfg.HealthChecks.Passive.UnhealthyTimeout)
+		logger.Info().Int("threshold", cfg.HealthChecks.Passive.UnhealthyThreshold).
+			Int("timeout_seconds", cfg.HealthChecks.Passive.UnhealthyTimeout).
+			Msg("passive health checks enabled")
 	} else {
-		log.Printf("  - Passive health checks: Disabled")
+		logger.Info().Msg("passive health checks disabled")
 	}
 
 	// Start the server with or without TLS based on configuration
 	if cfg.Server.TLS.Enabled {
-		log.Println("TLS is enabled.")
+		logger.Info().Msg("tls enabled")
 
 		// Validate that cert and key files are specified
 		if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
-			log.Fatal("TLS is enabled, but certFile or keyFile is not specified in the configuration.")
+			logger.Fatal().Msg("tls enabled but certificate or key not configured")
 		}
 
 		// Check if the certificate and key files exist
 		if _, err := os.Stat(cfg.Server.TLS.CertFile); os.IsNotExist(err) {
-			log.Fatalf("TLS certificate file not found: %s", cfg.Server.TLS.CertFile)
+			logger.Fatal().Str("cert_file", cfg.Server.TLS.CertFile).Msg("tls certificate file not found")
 		}
 		if _, err := os.Stat(cfg.Server.TLS.KeyFile); os.IsNotExist(err) {
-			log.Fatalf("TLS key file not found: %s", cfg.Server.TLS.KeyFile)
+			logger.Fatal().Str("key_file", cfg.Server.TLS.KeyFile).Msg("tls key file not found")
 		}
 
-		log.Printf("Listening for HTTPS on port %d", cfg.Server.Port)
+		logger.Info().Int("port", cfg.Server.Port).Msg("listening for https")
 		if err := server.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile); err != nil {
-			log.Fatalf("Failed to start TLS server: %v", err)
+			logger.Fatal().Err(err).Msg("failed to start tls server")
 		}
 	} else {
-		log.Printf("Listening for HTTP on port %d", cfg.Server.Port)
+		logger.Info().Int("port", cfg.Server.Port).Msg("listening for http")
 		if err := server.ListenAndServe(); err != nil {
-			log.Fatalf("Failed to start HTTP server: %v", err)
+			logger.Fatal().Err(err).Msg("failed to start http server")
 		}
 	}
 }

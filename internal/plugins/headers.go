@@ -28,14 +28,15 @@ func toStringMap(v interface{}) (map[string]string, error) {
 // init registers a simple headers plugin
 // Config example:
 // plugins:
-//   enabled: true
-//   chain:
-//     - name: headers
-//       config:
-//         set:
-//           X-App: Helios
-//         request_set:
-//           X-From: LB
+//
+//	enabled: true
+//	chain:
+//	  - name: headers
+//	    config:
+//	      set:
+//	        X-App: Helios
+//	      request_set:
+//	        X-From: LB
 func init() {
 	RegisterBuiltin("headers", func(name string, cfg map[string]interface{}) (Middleware, error) {
 		setMap, err := toStringMap(cfg["set"])
