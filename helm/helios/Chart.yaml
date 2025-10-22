@@ -1,0 +1,13 @@
+apiVersion: v2
+name: helios
+description: "Helios L7 reverse proxy and load balancer"
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+- reverse-proxy
+- load-balancer
+- helios
+maintainers:
+- name: Allen Elzayn
+  email: "maintainer@example.com"
