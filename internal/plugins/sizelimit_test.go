@@ -36,11 +36,19 @@ func createSizeLimitPlugin(t *testing.T, maxRequestBody, maxResponseBody int) Mi
 	return mw
 }
 
-// executeMiddleware executes the middleware with the given handler and request
-func executeMiddleware(mw Middleware, handler http.Handler, method, path string, body io.Reader) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(method, path, body)
+// testRequest holds parameters for executing a test request
+type testRequest struct {
+	middleware Middleware
+	handler    http.Handler
+	method     string
+	body       io.Reader
+}
+
+// executeRequest executes the middleware with the given test request parameters
+func executeRequest(req testRequest) *httptest.ResponseRecorder {
+	httpReq := httptest.NewRequest(req.method, testPath, req.body)
 	rec := httptest.NewRecorder()
-	mw(handler).ServeHTTP(rec, req)
+	req.middleware(req.handler).ServeHTTP(rec, httpReq)
 	return rec
 }
 
@@ -119,7 +127,12 @@ func TestSizeLimitPlugin_RequestBodyLimits(t *testing.T) {
 
 			// Create request with specified body size and execute middleware
 			requestBody := bytes.Repeat([]byte("a"), tt.bodySize)
-			rec := executeMiddleware(mw, handler, "POST", testPath, bytes.NewReader(requestBody))
+			rec := executeRequest(testRequest{
+				middleware: mw,
+				handler:    handler,
+				method:     "POST",
+				body:       bytes.NewReader(requestBody),
+			})
 
 			// Assert status code
 			assertStatusCode(t, rec, tt.expectedStatus)
@@ -140,7 +153,11 @@ func TestSizeLimitPlugin_ResponseBodyExceedsLimit(t *testing.T) {
 	})
 
 	mw := createSizeLimitPlugin(t, 1000, 100) // 100-byte response limit
-	rec := executeMiddleware(mw, handler, "GET", testPath, nil)
+	rec := executeRequest(testRequest{
+		middleware: mw,
+		handler:    handler,
+		method:     "GET",
+	})
 
 	// Should return 413 when the response size limit is exceeded
 	assertStatusCode(t, rec, http.StatusRequestEntityTooLarge)
@@ -154,7 +171,11 @@ func TestSizeLimitPlugin_ResponseBodyWithinLimit(t *testing.T) {
 	})
 
 	mw := createSizeLimitPlugin(t, 1000, 1000)
-	rec := executeMiddleware(mw, handler, "GET", testPath, nil)
+	rec := executeRequest(testRequest{
+		middleware: mw,
+		handler:    handler,
+		method:     "GET",
+	})
 
 	assertStatusCode(t, rec, http.StatusOK)
 	if rec.Body.String() != responseData {
@@ -169,7 +190,11 @@ func TestSizeLimitPlugin_DefaultConfiguration(t *testing.T) {
 		t.Fatalf(testCreateErr, err)
 	}
 
-	rec := executeMiddleware(mw, simpleOKHandler(), "GET", testPath, nil)
+	rec := executeRequest(testRequest{
+		middleware: mw,
+		handler:    simpleOKHandler(),
+		method:     "GET",
+	})
 	assertStatusCode(t, rec, http.StatusOK)
 }
 
@@ -242,7 +267,11 @@ func TestSizeLimitPlugin_MultipleWrites(t *testing.T) {
 	})
 
 	mw := createSizeLimitPlugin(t, 1000, 100)
-	rec := executeMiddleware(mw, handler, "GET", testPath, nil)
+	rec := executeRequest(testRequest{
+		middleware: mw,
+		handler:    handler,
+		method:     "GET",
+	})
 
 	// After some writes succeed, status is already 200 and can't be changed
 	assertStatusCode(t, rec, http.StatusOK)
@@ -256,7 +285,11 @@ func TestSizeLimitPlugin_MultipleWrites(t *testing.T) {
 
 func TestSizeLimitPlugin_EmptyBody(t *testing.T) {
 	mw := createSizeLimitPlugin(t, 1000, 1000)
-	rec := executeMiddleware(mw, simpleOKHandler(), "GET", testPath, nil)
+	rec := executeRequest(testRequest{
+		middleware: mw,
+		handler:    simpleOKHandler(),
+		method:     "GET",
+	})
 	assertStatusCode(t, rec, http.StatusOK)
 }
 
@@ -271,6 +304,10 @@ func TestSizeLimitPlugin_Float64Configuration(t *testing.T) {
 		t.Fatalf(testCreateErr, err)
 	}
 
-	rec := executeMiddleware(mw, simpleOKHandler(), "GET", testPath, nil)
+	rec := executeRequest(testRequest{
+		middleware: mw,
+		handler:    simpleOKHandler(),
+		method:     "GET",
+	})
 	assertStatusCode(t, rec, http.StatusOK)
 }
