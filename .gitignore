@@ -22,6 +22,8 @@ go.work
 .vscode/
 *.swp
 *.swo
+.serena
+.kiro
 
 # OS specific files
 .DS_Store
