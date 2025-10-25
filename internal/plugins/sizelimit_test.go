@@ -64,7 +64,7 @@ func assertStatusCode(t *testing.T, rec *httptest.ResponseRecorder, expected int
 func simpleOKHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok")) // Explicitly ignore in tests
 	})
 }
 
@@ -119,7 +119,7 @@ func TestSizeLimitPlugin_RequestBodyLimits(t *testing.T) {
 					return
 				}
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("Received: " + string(body)))
+				_, _ = w.Write([]byte("Received: " + string(body))) // Explicitly ignore in tests
 			})
 
 			// Create plugin with specified limit
@@ -149,7 +149,7 @@ func TestSizeLimitPlugin_ResponseBodyExceedsLimit(t *testing.T) {
 	// Create a mock next handler that writes a large response
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(strings.Repeat("b", 200))) // Try to write 200 bytes
+		_, _ = w.Write([]byte(strings.Repeat("b", 200))) // Explicitly ignore in tests - Try to write 200 bytes
 	})
 
 	mw := createSizeLimitPlugin(t, 1000, 100) // 100-byte response limit
@@ -167,7 +167,7 @@ func TestSizeLimitPlugin_ResponseBodyWithinLimit(t *testing.T) {
 	responseData := "This is a test response"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(responseData))
+		_, _ = w.Write([]byte(responseData)) // Explicitly ignore in tests
 	})
 
 	mw := createSizeLimitPlugin(t, 1000, 1000)
@@ -262,7 +262,7 @@ func TestSizeLimitPlugin_MultipleWrites(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		// Write in chunks: 5 * 30 bytes = 150 bytes total
 		for i := 0; i < 5; i++ {
-			w.Write([]byte(strings.Repeat("x", 30)))
+			_, _ = w.Write([]byte(strings.Repeat("x", 30))) // Explicitly ignore in tests
 		}
 	})
 
