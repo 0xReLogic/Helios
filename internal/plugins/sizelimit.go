@@ -7,6 +7,14 @@ import (
 	"net/http"
 )
 
+const (
+	// DefaultMaxRequestBody is the default maximum size for request bodies (10MB)
+	DefaultMaxRequestBody = 10 * 1024 * 1024 // 10MB
+
+	// DefaultMaxResponseBody is the default maximum size for response bodies (50MB)
+	DefaultMaxResponseBody = 50 * 1024 * 1024 // 50MB
+)
+
 // limitedResponseWriter wraps http.ResponseWriter to track and limit bytes written
 type limitedResponseWriter struct {
 	http.ResponseWriter
@@ -75,70 +83,71 @@ func (lrw *limitedResponseWriter) Flush() {
 	}
 }
 
+// parseByteLimit extracts and validates a byte limit from the configuration
+func parseByteLimit(cfg map[string]interface{}, key string, defaultValue int64) (int64, error) {
+	val, ok := cfg[key]
+	if !ok {
+		return defaultValue, nil
+	}
+
+	var limit int64
+	switch v := val.(type) {
+	case int:
+		limit = int64(v)
+	case int64:
+		limit = v
+	case float64:
+		limit = int64(v)
+	default:
+		return 0, fmt.Errorf("%s must be a number, got %T", key, val)
+	}
+
+	if limit <= 0 {
+		return 0, fmt.Errorf("%s must be positive, got %d", key, limit)
+	}
+
+	return limit, nil
+}
+
+// newSizeLimitMiddleware creates a new size limit middleware with the given configuration
+func newSizeLimitMiddleware(name string, cfg map[string]interface{}) (Middleware, error) {
+	// Parse and validate configuration
+	maxRequestBody, err := parseByteLimit(cfg, "max_request_body", DefaultMaxRequestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	maxResponseBody, err := parseByteLimit(cfg, "max_response_body", DefaultMaxResponseBody)
+	if err != nil {
+		return nil, err
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Limit request body size
+			// http.MaxBytesReader returns a ReadCloser that stops reading once
+			// the limit is exceeded and returns an error
+			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+
+			// Wrap response writer to limit response size
+			lrw := &limitedResponseWriter{
+				ResponseWriter: w,
+				written:        0,
+				limit:          maxResponseBody,
+				limitReached:   false,
+				wroteHeader:    false,
+				statusCode:     0,
+			}
+
+			// Call next handler with the limited response writer
+			next.ServeHTTP(lrw, r)
+
+			// If we hit the response limit, log it or handle it
+			// The limitedResponseWriter already sent 413 if limit was exceeded
+		})
+	}, nil
+}
+
 func init() {
-	RegisterBuiltin("size_limit", func(name string, cfg map[string]interface{}) (Middleware, error) {
-		// Parse configuration with defaults
-		// Default: 10MB for requests
-		maxRequestBody := int64(10485760) // 10MB default
-		if val, ok := cfg["max_request_body"]; ok {
-			switch v := val.(type) {
-			case int:
-				maxRequestBody = int64(v)
-			case int64:
-				maxRequestBody = v
-			case float64:
-				maxRequestBody = int64(v)
-			default:
-				return nil, fmt.Errorf("max_request_body must be a number, got %T", val)
-			}
-		}
-
-		// Default: 50MB for responses
-		maxResponseBody := int64(52428800) // 50MB default
-		if val, ok := cfg["max_response_body"]; ok {
-			switch v := val.(type) {
-			case int:
-				maxResponseBody = int64(v)
-			case int64:
-				maxResponseBody = v
-			case float64:
-				maxResponseBody = int64(v)
-			default:
-				return nil, fmt.Errorf("max_response_body must be a number, got %T", val)
-			}
-		}
-
-		// Validate limits
-		if maxRequestBody <= 0 {
-			return nil, fmt.Errorf("max_request_body must be positive, got %d", maxRequestBody)
-		}
-		if maxResponseBody <= 0 {
-			return nil, fmt.Errorf("max_response_body must be positive, got %d", maxResponseBody)
-		}
-
-		return func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Limit request body size
-				// http.MaxBytesReader returns a ReadCloser that stops reading once
-				// the limit is exceeded and returns an error
-				r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
-
-				// Wrap response writer to limit response size
-				lrw := &limitedResponseWriter{
-					ResponseWriter: w,
-					written:        0,
-					limit:          maxResponseBody,
-					limitReached:   false,
-					wroteHeader:    false,
-					statusCode:     0,
-				}
-
-				// Call next handler with the limited response writer
-				next.ServeHTTP(lrw, r)
-
-				// If we hit the response limit, log it or handle it
-				// The limitedResponseWriter already sent 413 if limit was exceeded
-			})
-		}, nil
-	})
+	RegisterBuiltin("size_limit", newSizeLimitMiddleware)
 }
