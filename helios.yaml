@@ -68,6 +68,10 @@ plugins:
   enabled: true
   chain:
     - name: logging
+    - name: size_limit
+      config:
+        max_request_body: 10485760   # 10MB in bytes
+        max_response_body: 52428800  # 50MB in bytes
     - name: headers
       config:
         set:

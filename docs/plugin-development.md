@@ -338,3 +338,79 @@ By following this pattern, you can write robust and isolated tests for your Heli
 
 ## 6. Example Plugins
 You can try out the example plugins in `internal/plugins/` directory. The plugins with `example_` prefix are example plugins.
+
+### Built-in Plugin: Size Limit
+
+The `size_limit` plugin protects your gateway from resource exhaustion attacks by limiting the size of request and response bodies. When a limit is exceeded, the plugin returns HTTP 413 (Payload Too Large).
+
+**Features:**
+- Separate configurable limits for request and response bodies
+- Returns HTTP 413 (Payload Too Large) when limits are exceeded
+- Prevents memory exhaustion from malicious large payloads
+- Default limits: 10MB for requests, 50MB for responses
+
+**Configuration Example:**
+
+```yaml
+plugins:
+  enabled: true
+  chain:
+    - name: size_limit
+      config:
+        max_request_body: 10485760   # 10MB in bytes
+        max_response_body: 52428800  # 50MB in bytes
+```
+
+**Configuration Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `max_request_body` | integer | 10485760 (10MB) | Maximum allowed size for request bodies in bytes |
+| `max_response_body` | integer | 52428800 (50MB) | Maximum allowed size for response bodies in bytes |
+
+**Implementation Details:**
+
+The plugin uses two mechanisms for size limiting:
+
+1. **Request Body Limiting**: Uses Go's built-in `http.MaxBytesReader` to limit incoming request body size. When a client sends a request body exceeding the limit, the handler will receive an error when attempting to read the body, allowing it to return a 413 status code.
+
+2. **Response Body Limiting**: Wraps the `http.ResponseWriter` with a custom writer that tracks bytes written. If the response would exceed the configured limit:
+   - If no data has been written yet, the plugin returns HTTP 413 immediately
+   - If some data has already been sent, the plugin stops writing additional data (HTTP status cannot be changed once headers are sent)
+
+**Use Cases:**
+
+- **API Gateway Protection**: Prevent clients from uploading extremely large files
+- **Memory Protection**: Protect backend services from sending unexpectedly large responses
+- **DoS Prevention**: Mitigate denial-of-service attacks using large payloads
+- **Compliance**: Enforce organizational policies on maximum request/response sizes
+
+**Example: Protecting a File Upload Endpoint**
+
+```yaml
+plugins:
+  enabled: true
+  chain:
+    - name: size_limit
+      config:
+        max_request_body: 5242880  # 5MB limit for file uploads
+        max_response_body: 1048576  # 1MB limit for API responses
+```
+
+**Testing the Plugin:**
+
+```bash
+# Test with a request exceeding the limit
+dd if=/dev/zero bs=1M count=20 | curl -X POST http://localhost:8080/upload \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @-
+
+# Expected: HTTP 413 Payload Too Large
+```
+
+**Important Notes:**
+
+- Limits are enforced per-request, not per-connection
+- WebSocket connections are not affected by response body limits after the upgrade
+- For very large file uploads, consider using streaming or chunked transfer encoding
+- Response limiting cannot change HTTP status codes once headers are sent to the client
