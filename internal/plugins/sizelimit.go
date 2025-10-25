@@ -2,9 +2,12 @@ package plugins
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+
+	logging "github.com/0xReLogic/Helios/internal/logging"
 )
 
 const (
@@ -23,39 +26,64 @@ type limitedResponseWriter struct {
 	limitReached bool
 	wroteHeader  bool
 	statusCode   int
+	ctx          context.Context
 }
 
 // Write implements io.Writer, tracking bytes written and enforcing the limit
 func (lrw *limitedResponseWriter) Write(b []byte) (int, error) {
 	if lrw.limitReached {
-		// Already hit the limit, don't write more
 		return 0, fmt.Errorf("response body exceeds limit of %d bytes", lrw.limit)
 	}
 
-	// Check if writing this chunk would exceed the limit
-	if lrw.written+int64(len(b)) > lrw.limit {
-		lrw.limitReached = true
-		// If headers haven't been written yet, set the 413 status
-		if !lrw.wroteHeader {
-			lrw.statusCode = http.StatusRequestEntityTooLarge
-			lrw.ResponseWriter.WriteHeader(http.StatusRequestEntityTooLarge)
-			lrw.wroteHeader = true
-		}
-		return 0, fmt.Errorf("response body exceeds limit of %d bytes", lrw.limit)
+	if err := lrw.checkLimit(b); err != nil {
+		return 0, err
 	}
 
-	// Write the header if not already written
-	if !lrw.wroteHeader {
-		if lrw.statusCode == 0 {
-			lrw.statusCode = http.StatusOK
-		}
-		lrw.ResponseWriter.WriteHeader(lrw.statusCode)
-		lrw.wroteHeader = true
-	}
+	lrw.ensureHeaderWritten()
 
 	n, err := lrw.ResponseWriter.Write(b)
 	lrw.written += int64(n)
 	return n, err
+}
+
+// checkLimit validates that writing b would not exceed the response body limit
+func (lrw *limitedResponseWriter) checkLimit(b []byte) error {
+	if lrw.written+int64(len(b)) <= lrw.limit {
+		return nil
+	}
+
+	lrw.limitReached = true
+
+	// Log the violation
+	logging.WithContext(lrw.ctx).Warn().
+		Int64("limit", lrw.limit).
+		Int64("attempted", lrw.written+int64(len(b))).
+		Int64("current", lrw.written).
+		Str("type", "response").
+		Msg("response body size limit exceeded")
+
+	// If headers haven't been written yet, set the 413 status
+	if !lrw.wroteHeader {
+		lrw.statusCode = http.StatusRequestEntityTooLarge
+		lrw.ResponseWriter.WriteHeader(http.StatusRequestEntityTooLarge)
+		lrw.wroteHeader = true
+	}
+
+	return fmt.Errorf("response body exceeds limit of %d bytes", lrw.limit)
+}
+
+// ensureHeaderWritten writes the response header if it hasn't been written yet
+func (lrw *limitedResponseWriter) ensureHeaderWritten() {
+	if lrw.wroteHeader {
+		return
+	}
+
+	if lrw.statusCode == 0 {
+		lrw.statusCode = http.StatusOK
+	}
+
+	lrw.ResponseWriter.WriteHeader(lrw.statusCode)
+	lrw.wroteHeader = true
 }
 
 // WriteHeader records the status code but doesn't write it yet
@@ -126,7 +154,7 @@ func newSizeLimitMiddleware(name string, cfg map[string]interface{}) (Middleware
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Limit request body size
 			// http.MaxBytesReader returns a ReadCloser that stops reading once
-			// the limit is exceeded and returns an error
+			// the limit is exceeded and returns an error that the handler will receive
 			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 
 			// Wrap response writer to limit response size
@@ -137,13 +165,11 @@ func newSizeLimitMiddleware(name string, cfg map[string]interface{}) (Middleware
 				limitReached:   false,
 				wroteHeader:    false,
 				statusCode:     0,
+				ctx:            r.Context(),
 			}
 
 			// Call next handler with the limited response writer
 			next.ServeHTTP(lrw, r)
-
-			// If we hit the response limit, log it or handle it
-			// The limitedResponseWriter already sent 413 if limit was exceeded
 		})
 	}, nil
 }

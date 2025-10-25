@@ -9,6 +9,18 @@ import (
 	"testing"
 )
 
+const (
+	// Test constants to reduce code duplication
+	testPluginName          = "size_limit"
+	testCreateErr           = "failed to create plugin: %v"
+	testPath                = "/test"
+	testMaxRequestBodyKey   = "max_request_body"
+	testMaxResponseBodyKey  = "max_response_body"
+	testExpectedStatusErr   = "expected status %d, got %d"
+	testExpectedBodyLenErr  = "expected body length exactly %d bytes (3 successful writes), got %d"
+	testExpectedBodyContain = "expected response to contain '%s'"
+)
+
 func TestSizeLimitPlugin_RequestBodyLimits(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -64,17 +76,17 @@ func TestSizeLimitPlugin_RequestBodyLimits(t *testing.T) {
 			})
 
 			// Create plugin with specified limit
-			mw, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-				"max_request_body":  tt.limit,
-				"max_response_body": 10000,
+			mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+				testMaxRequestBodyKey:  tt.limit,
+				testMaxResponseBodyKey: 10000,
 			})
 			if err != nil {
-				t.Fatalf("failed to create plugin: %v", err)
+				t.Fatalf(testCreateErr, err)
 			}
 
 			// Create request with specified body size
 			requestBody := bytes.Repeat([]byte("a"), tt.bodySize)
-			req := httptest.NewRequest("POST", "/test", bytes.NewReader(requestBody))
+			req := httptest.NewRequest("POST", testPath, bytes.NewReader(requestBody))
 			rec := httptest.NewRecorder()
 
 			// Execute middleware
@@ -82,12 +94,12 @@ func TestSizeLimitPlugin_RequestBodyLimits(t *testing.T) {
 
 			// Assert status code
 			if rec.Code != tt.expectedStatus {
-				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
+				t.Errorf(testExpectedStatusErr, tt.expectedStatus, rec.Code)
 			}
 
 			// Assert response body if specified
 			if tt.expectBodyContains != "" && !strings.Contains(rec.Body.String(), tt.expectBodyContains) {
-				t.Errorf("expected response to contain '%s'", tt.expectBodyContains)
+				t.Errorf(testExpectedBodyContain, tt.expectBodyContains)
 			}
 		})
 	}
@@ -102,15 +114,15 @@ func TestSizeLimitPlugin_ResponseBodyExceedsLimit(t *testing.T) {
 	})
 
 	// Create the plugin with a 100-byte response limit
-	mw, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_request_body":  1000,
-		"max_response_body": 100,
+	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey:  1000,
+		testMaxResponseBodyKey: 100,
 	})
 	if err != nil {
-		t.Fatalf("failed to create plugin: %v", err)
+		t.Fatalf(testCreateErr, err)
 	}
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", testPath, nil)
 	rec := httptest.NewRecorder()
 
 	// Execute the middleware
@@ -118,7 +130,7 @@ func TestSizeLimitPlugin_ResponseBodyExceedsLimit(t *testing.T) {
 
 	// Should return 413 (Payload Too Large) when the response size limit is exceeded
 	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("expected status %d for oversized response, got %d", http.StatusRequestEntityTooLarge, rec.Code)
+		t.Errorf(testExpectedStatusErr, http.StatusRequestEntityTooLarge, rec.Code)
 	}
 }
 
@@ -131,15 +143,15 @@ func TestSizeLimitPlugin_ResponseBodyWithinLimit(t *testing.T) {
 	})
 
 	// Create the plugin with a 1000-byte response limit
-	mw, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_request_body":  1000,
-		"max_response_body": 1000,
+	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey:  1000,
+		testMaxResponseBodyKey: 1000,
 	})
 	if err != nil {
-		t.Fatalf("failed to create plugin: %v", err)
+		t.Fatalf(testCreateErr, err)
 	}
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", testPath, nil)
 	rec := httptest.NewRecorder()
 
 	// Execute the middleware
@@ -147,7 +159,7 @@ func TestSizeLimitPlugin_ResponseBodyWithinLimit(t *testing.T) {
 
 	// Should return 200 OK
 	if rec.Code != http.StatusOK {
-		t.Errorf("expected status %d for response within limit, got %d", http.StatusOK, rec.Code)
+		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
 	}
 
 	// Check response body
@@ -158,9 +170,9 @@ func TestSizeLimitPlugin_ResponseBodyWithinLimit(t *testing.T) {
 
 func TestSizeLimitPlugin_DefaultConfiguration(t *testing.T) {
 	// Create the plugin with no configuration (should use defaults)
-	mw, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{})
+	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{})
 	if err != nil {
-		t.Fatalf("failed to create plugin with default config: %v", err)
+		t.Fatalf(testCreateErr, err)
 	}
 
 	// Create a small request
@@ -169,21 +181,21 @@ func TestSizeLimitPlugin_DefaultConfiguration(t *testing.T) {
 		w.Write([]byte("ok"))
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", testPath, nil)
 	rec := httptest.NewRecorder()
 
 	mw(handler).ServeHTTP(rec, req)
 
 	// Should work fine with defaults
 	if rec.Code != http.StatusOK {
-		t.Errorf("expected status %d with default config, got %d", http.StatusOK, rec.Code)
+		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
 	}
 }
 
 func TestSizeLimitPlugin_InvalidConfiguration_NegativeRequestLimit(t *testing.T) {
 	// Try to create the plugin with negative request limit
-	_, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_request_body": -100,
+	_, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey: -100,
 	})
 	if err == nil {
 		t.Error("expected error for negative max_request_body, got nil")
@@ -192,8 +204,8 @@ func TestSizeLimitPlugin_InvalidConfiguration_NegativeRequestLimit(t *testing.T)
 
 func TestSizeLimitPlugin_InvalidConfiguration_NegativeResponseLimit(t *testing.T) {
 	// Try to create the plugin with negative response limit
-	_, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_response_body": -100,
+	_, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxResponseBodyKey: -100,
 	})
 	if err == nil {
 		t.Error("expected error for negative max_response_body, got nil")
@@ -202,8 +214,8 @@ func TestSizeLimitPlugin_InvalidConfiguration_NegativeResponseLimit(t *testing.T
 
 func TestSizeLimitPlugin_InvalidConfiguration_ZeroRequestLimit(t *testing.T) {
 	// Try to create the plugin with zero request limit
-	_, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_request_body": 0,
+	_, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey: 0,
 	})
 	if err == nil {
 		t.Error("expected error for zero max_request_body, got nil")
@@ -212,8 +224,8 @@ func TestSizeLimitPlugin_InvalidConfiguration_ZeroRequestLimit(t *testing.T) {
 
 func TestSizeLimitPlugin_InvalidConfiguration_ZeroResponseLimit(t *testing.T) {
 	// Try to create the plugin with zero response limit
-	_, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_response_body": 0,
+	_, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxResponseBodyKey: 0,
 	})
 	if err == nil {
 		t.Error("expected error for zero max_response_body, got nil")
@@ -222,16 +234,16 @@ func TestSizeLimitPlugin_InvalidConfiguration_ZeroResponseLimit(t *testing.T) {
 
 func TestSizeLimitPlugin_InvalidConfiguration_WrongType(t *testing.T) {
 	// Try to create the plugin with wrong type for request limit
-	_, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_request_body": "not-a-number",
+	_, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey: "not-a-number",
 	})
 	if err == nil {
 		t.Error("expected error for non-numeric max_request_body, got nil")
 	}
 
 	// Try with wrong type for response limit
-	_, err = builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_response_body": "not-a-number",
+	_, err = builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxResponseBodyKey: "not-a-number",
 	})
 	if err == nil {
 		t.Error("expected error for non-numeric max_response_body, got nil")
@@ -248,15 +260,15 @@ func TestSizeLimitPlugin_MultipleWrites(t *testing.T) {
 		}
 	})
 
-	mw, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_request_body":  1000,
-		"max_response_body": 100,
+	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey:  1000,
+		testMaxResponseBodyKey: 100,
 	})
 	if err != nil {
-		t.Fatalf("failed to create plugin: %v", err)
+		t.Fatalf(testCreateErr, err)
 	}
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", testPath, nil)
 	rec := httptest.NewRecorder()
 
 	mw(handler).ServeHTTP(rec, req)
@@ -264,13 +276,13 @@ func TestSizeLimitPlugin_MultipleWrites(t *testing.T) {
 	// After some writes succeed, status is already 200 and can't be changed
 	// The important thing is that not all data was written (only first 90 bytes)
 	if rec.Code != http.StatusOK {
-		t.Errorf("expected status 200 (headers already sent), got %d", rec.Code)
+		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
 	}
 
 	// Verify exact truncation: 3 writes of 30 bytes = 90 bytes (4th write fails at 120 > 100)
 	expectedBodyLen := 90
 	if rec.Body.Len() != expectedBodyLen {
-		t.Errorf("expected body length exactly %d bytes (3 successful writes), got %d", expectedBodyLen, rec.Body.Len())
+		t.Errorf(testExpectedBodyLenErr, expectedBodyLen, rec.Body.Len())
 	}
 }
 
@@ -281,34 +293,34 @@ func TestSizeLimitPlugin_EmptyBody(t *testing.T) {
 		w.Write([]byte("ok"))
 	})
 
-	mw, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_request_body":  1000,
-		"max_response_body": 1000,
+	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey:  1000,
+		testMaxResponseBodyKey: 1000,
 	})
 	if err != nil {
-		t.Fatalf("failed to create plugin: %v", err)
+		t.Fatalf(testCreateErr, err)
 	}
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", testPath, nil)
 	rec := httptest.NewRecorder()
 
 	mw(handler).ServeHTTP(rec, req)
 
 	// Should work fine with empty body
 	if rec.Code != http.StatusOK {
-		t.Errorf("expected status %d for empty body, got %d", http.StatusOK, rec.Code)
+		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
 	}
 }
 
 func TestSizeLimitPlugin_Float64Configuration(t *testing.T) {
 	// Test that float64 configuration values are handled correctly
 	// (YAML parsers may interpret large numbers as float64)
-	mw, err := builtins["size_limit"]("test-size-limit", map[string]interface{}{
-		"max_request_body":  float64(10485760), // 10MB as float64
-		"max_response_body": float64(52428800), // 50MB as float64
+	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey:  float64(10485760), // 10MB as float64
+		testMaxResponseBodyKey: float64(52428800), // 50MB as float64
 	})
 	if err != nil {
-		t.Fatalf("failed to create plugin with float64 config: %v", err)
+		t.Fatalf(testCreateErr, err)
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -316,13 +328,13 @@ func TestSizeLimitPlugin_Float64Configuration(t *testing.T) {
 		w.Write([]byte("ok"))
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", testPath, nil)
 	rec := httptest.NewRecorder()
 
 	mw(handler).ServeHTTP(rec, req)
 
 	// Should work fine
 	if rec.Code != http.StatusOK {
-		t.Errorf("expected status %d with float64 config, got %d", http.StatusOK, rec.Code)
+		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
 	}
 }
