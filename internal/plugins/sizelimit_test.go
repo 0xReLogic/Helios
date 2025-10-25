@@ -21,6 +21,45 @@ const (
 	testExpectedBodyContain = "expected response to contain '%s'"
 )
 
+// Helper functions to reduce test code duplication
+
+// createSizeLimitPlugin creates a size limit plugin with the given limits
+func createSizeLimitPlugin(t *testing.T, maxRequestBody, maxResponseBody int) Middleware {
+	t.Helper()
+	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
+		testMaxRequestBodyKey:  maxRequestBody,
+		testMaxResponseBodyKey: maxResponseBody,
+	})
+	if err != nil {
+		t.Fatalf(testCreateErr, err)
+	}
+	return mw
+}
+
+// executeMiddleware executes the middleware with the given handler and request
+func executeMiddleware(mw Middleware, handler http.Handler, method, path string, body io.Reader) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, body)
+	rec := httptest.NewRecorder()
+	mw(handler).ServeHTTP(rec, req)
+	return rec
+}
+
+// assertStatusCode checks that the response has the expected status code
+func assertStatusCode(t *testing.T, rec *httptest.ResponseRecorder, expected int) {
+	t.Helper()
+	if rec.Code != expected {
+		t.Errorf(testExpectedStatusErr, expected, rec.Code)
+	}
+}
+
+// simpleOKHandler returns a handler that writes "ok"
+func simpleOKHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+}
+
 func TestSizeLimitPlugin_RequestBodyLimits(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -76,26 +115,14 @@ func TestSizeLimitPlugin_RequestBodyLimits(t *testing.T) {
 			})
 
 			// Create plugin with specified limit
-			mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
-				testMaxRequestBodyKey:  tt.limit,
-				testMaxResponseBodyKey: 10000,
-			})
-			if err != nil {
-				t.Fatalf(testCreateErr, err)
-			}
+			mw := createSizeLimitPlugin(t, tt.limit, 10000)
 
-			// Create request with specified body size
+			// Create request with specified body size and execute middleware
 			requestBody := bytes.Repeat([]byte("a"), tt.bodySize)
-			req := httptest.NewRequest("POST", testPath, bytes.NewReader(requestBody))
-			rec := httptest.NewRecorder()
-
-			// Execute middleware
-			mw(handler).ServeHTTP(rec, req)
+			rec := executeMiddleware(mw, handler, "POST", testPath, bytes.NewReader(requestBody))
 
 			// Assert status code
-			if rec.Code != tt.expectedStatus {
-				t.Errorf(testExpectedStatusErr, tt.expectedStatus, rec.Code)
-			}
+			assertStatusCode(t, rec, tt.expectedStatus)
 
 			// Assert response body if specified
 			if tt.expectBodyContains != "" && !strings.Contains(rec.Body.String(), tt.expectBodyContains) {
@@ -109,60 +136,27 @@ func TestSizeLimitPlugin_ResponseBodyExceedsLimit(t *testing.T) {
 	// Create a mock next handler that writes a large response
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		// Try to write 200 bytes
-		w.Write([]byte(strings.Repeat("b", 200)))
+		w.Write([]byte(strings.Repeat("b", 200))) // Try to write 200 bytes
 	})
 
-	// Create the plugin with a 100-byte response limit
-	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
-		testMaxRequestBodyKey:  1000,
-		testMaxResponseBodyKey: 100,
-	})
-	if err != nil {
-		t.Fatalf(testCreateErr, err)
-	}
+	mw := createSizeLimitPlugin(t, 1000, 100) // 100-byte response limit
+	rec := executeMiddleware(mw, handler, "GET", testPath, nil)
 
-	req := httptest.NewRequest("GET", testPath, nil)
-	rec := httptest.NewRecorder()
-
-	// Execute the middleware
-	mw(handler).ServeHTTP(rec, req)
-
-	// Should return 413 (Payload Too Large) when the response size limit is exceeded
-	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf(testExpectedStatusErr, http.StatusRequestEntityTooLarge, rec.Code)
-	}
+	// Should return 413 when the response size limit is exceeded
+	assertStatusCode(t, rec, http.StatusRequestEntityTooLarge)
 }
 
 func TestSizeLimitPlugin_ResponseBodyWithinLimit(t *testing.T) {
-	// Create a mock next handler that writes a response
 	responseData := "This is a test response"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(responseData))
 	})
 
-	// Create the plugin with a 1000-byte response limit
-	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
-		testMaxRequestBodyKey:  1000,
-		testMaxResponseBodyKey: 1000,
-	})
-	if err != nil {
-		t.Fatalf(testCreateErr, err)
-	}
+	mw := createSizeLimitPlugin(t, 1000, 1000)
+	rec := executeMiddleware(mw, handler, "GET", testPath, nil)
 
-	req := httptest.NewRequest("GET", testPath, nil)
-	rec := httptest.NewRecorder()
-
-	// Execute the middleware
-	mw(handler).ServeHTTP(rec, req)
-
-	// Should return 200 OK
-	if rec.Code != http.StatusOK {
-		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
-	}
-
-	// Check response body
+	assertStatusCode(t, rec, http.StatusOK)
 	if rec.Body.String() != responseData {
 		t.Errorf("expected response '%s', got '%s'", responseData, rec.Body.String())
 	}
@@ -175,21 +169,8 @@ func TestSizeLimitPlugin_DefaultConfiguration(t *testing.T) {
 		t.Fatalf(testCreateErr, err)
 	}
 
-	// Create a small request
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	req := httptest.NewRequest("GET", testPath, nil)
-	rec := httptest.NewRecorder()
-
-	mw(handler).ServeHTTP(rec, req)
-
-	// Should work fine with defaults
-	if rec.Code != http.StatusOK {
-		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
-	}
+	rec := executeMiddleware(mw, simpleOKHandler(), "GET", testPath, nil)
+	assertStatusCode(t, rec, http.StatusOK)
 }
 
 func TestSizeLimitPlugin_InvalidConfiguration_NegativeRequestLimit(t *testing.T) {
@@ -254,30 +235,17 @@ func TestSizeLimitPlugin_MultipleWrites(t *testing.T) {
 	// Test response with multiple writes that collectively exceed limit
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		// Write in chunks
+		// Write in chunks: 5 * 30 bytes = 150 bytes total
 		for i := 0; i < 5; i++ {
 			w.Write([]byte(strings.Repeat("x", 30)))
 		}
 	})
 
-	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
-		testMaxRequestBodyKey:  1000,
-		testMaxResponseBodyKey: 100,
-	})
-	if err != nil {
-		t.Fatalf(testCreateErr, err)
-	}
-
-	req := httptest.NewRequest("GET", testPath, nil)
-	rec := httptest.NewRecorder()
-
-	mw(handler).ServeHTTP(rec, req)
+	mw := createSizeLimitPlugin(t, 1000, 100)
+	rec := executeMiddleware(mw, handler, "GET", testPath, nil)
 
 	// After some writes succeed, status is already 200 and can't be changed
-	// The important thing is that not all data was written (only first 90 bytes)
-	if rec.Code != http.StatusOK {
-		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
-	}
+	assertStatusCode(t, rec, http.StatusOK)
 
 	// Verify exact truncation: 3 writes of 30 bytes = 90 bytes (4th write fails at 120 > 100)
 	expectedBodyLen := 90
@@ -287,29 +255,9 @@ func TestSizeLimitPlugin_MultipleWrites(t *testing.T) {
 }
 
 func TestSizeLimitPlugin_EmptyBody(t *testing.T) {
-	// Test with empty request body
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	mw, err := builtins[testPluginName](testPluginName, map[string]interface{}{
-		testMaxRequestBodyKey:  1000,
-		testMaxResponseBodyKey: 1000,
-	})
-	if err != nil {
-		t.Fatalf(testCreateErr, err)
-	}
-
-	req := httptest.NewRequest("GET", testPath, nil)
-	rec := httptest.NewRecorder()
-
-	mw(handler).ServeHTTP(rec, req)
-
-	// Should work fine with empty body
-	if rec.Code != http.StatusOK {
-		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
-	}
+	mw := createSizeLimitPlugin(t, 1000, 1000)
+	rec := executeMiddleware(mw, simpleOKHandler(), "GET", testPath, nil)
+	assertStatusCode(t, rec, http.StatusOK)
 }
 
 func TestSizeLimitPlugin_Float64Configuration(t *testing.T) {
@@ -323,18 +271,6 @@ func TestSizeLimitPlugin_Float64Configuration(t *testing.T) {
 		t.Fatalf(testCreateErr, err)
 	}
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	req := httptest.NewRequest("GET", testPath, nil)
-	rec := httptest.NewRecorder()
-
-	mw(handler).ServeHTTP(rec, req)
-
-	// Should work fine
-	if rec.Code != http.StatusOK {
-		t.Errorf(testExpectedStatusErr, http.StatusOK, rec.Code)
-	}
+	rec := executeMiddleware(mw, simpleOKHandler(), "GET", testPath, nil)
+	assertStatusCode(t, rec, http.StatusOK)
 }
