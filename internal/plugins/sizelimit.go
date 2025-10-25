@@ -152,9 +152,21 @@ func newSizeLimitMiddleware(name string, cfg map[string]interface{}) (Middleware
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Limit request body size
+			// Check Content-Length header first for quick rejection
+			if r.ContentLength > maxRequestBody {
+				logging.WithContext(r.Context()).Warn().
+					Int64("content_length", r.ContentLength).
+					Int64("limit", maxRequestBody).
+					Str("type", "request").
+					Msg("request body size limit exceeded")
+				
+				http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+
+			// Limit request body size for cases where Content-Length is not set
 			// http.MaxBytesReader returns a ReadCloser that stops reading once
-			// the limit is exceeded and returns an error that the handler will receive
+			// the limit is exceeded and returns an error
 			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 
 			// Wrap response writer to limit response size
