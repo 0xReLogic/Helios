@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  helios:
+    build: .
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+      - "9091:9091"
+    volumes:
+      - ./helios.yaml:/app/helios.yaml
+      - ./certs:/app/certs
+    depends_on:
+      - backend1
+      - backend2
+      - backend3
+
+  backend1:
+    image: nginx:alpine
+    ports:
+      - "8081:80"
+
+  backend2:
+    image: nginx:alpine
+    ports:
+      - "8082:80"
+
+  backend3:
+    image: nginx:alpine
+    ports:
+      - "8083:80"
