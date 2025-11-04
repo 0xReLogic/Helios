@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,7 +15,10 @@ import (
 
 func main() {
 	// Load configuration
-	cfg, err := config.LoadConfig("helios.yaml")
+	configPath := flag.String("config", "helios.yaml", "Path to config file")
+	flag.Parse()
+
+	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
 		logging.L().Fatal().Err(err).Msg("failed to load configuration")
 	}
