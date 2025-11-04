@@ -7,13 +7,13 @@
 
 backends:
   - name: "server1"
-    address: "http://backend1:80"
+    address: "http://backend1:8080"
     weight: 5
   - name: "server2"
-    address: "http://backend2:80"
+    address: "http://backend2:8080"
     weight: 2
   - name: "server3"
-    address: "http://backend3:80"
+    address: "http://backend3:8080"
     weight: 1
 
 load_balancer:

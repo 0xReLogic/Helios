@@ -14,6 +14,9 @@ const (
 	FailedToWriteError       = "failed to write response: %v"
 	PluginNotRegisteredError = "gzip plugin not registered"
 	ExpectedStatusError      = "expected status %d, got %d"
+	ContentEncodingHeader    = "Content-Encoding"
+	AcceptEncodingHeader     = "Accept-Encoding"
+	TestPath                 = "/test-path"
 )
 const largeBody = `{"message": "This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large. This is a very large JSON response that should be compressed. It needs to be long enough to exceed any reasonable minimum size threshold for gzip compression. We will repeat this string multiple times to ensure it's sufficiently large."}`
 const smallBody = `{"message": "small"}`
@@ -57,8 +60,8 @@ func decompressBody(t *testing.T, data []byte) string {
 
 func assertCompressed(t *testing.T, rec *httptest.ResponseRecorder, expectedBody string) {
 	// Assert: Response header Content-Encoding: gzip exists.
-	if rec.Header().Get("Content-Encoding") != "gzip" {
-		t.Errorf("expected Content-Encoding: gzip header, got %q", rec.Header().Get("Content-Encoding"))
+	if rec.Header().Get(ContentEncodingHeader) != "gzip" {
+		t.Errorf("expected Content-Encoding: gzip header, got %q", rec.Header().Get(ContentEncodingHeader))
 	}
 
 	// Assert: Body is smaller than original.
@@ -75,8 +78,8 @@ func assertCompressed(t *testing.T, rec *httptest.ResponseRecorder, expectedBody
 }
 
 func assertUncompressed(t *testing.T, rec *httptest.ResponseRecorder, expectedBody string) {
-	if rec.Header().Get("Content-Encoding") != "" {
-		t.Errorf("expected no Content-Encoding header, got %q", rec.Header().Get("Content-Encoding"))
+	if rec.Header().Get(ContentEncodingHeader) != "" {
+		t.Errorf("expected no Content-Encoding header, got %q", rec.Header().Get(ContentEncodingHeader))
 	}
 
 	// Assert: Body is uncompressed (identical to original).
@@ -177,9 +180,9 @@ func TestGzipCompression(t *testing.T) {
 
 			mw := newGzipMiddleware(t, tt.configLevel, tt.configMinSize, tt.configContentTypes)
 
-			req := httptest.NewRequest("GET", "/test-path", nil)
+			req := httptest.NewRequest("GET", TestPath, nil)
 			if tt.acceptEncoding != "" {
-				req.Header.Set("Accept-Encoding", tt.acceptEncoding)
+				req.Header.Set(AcceptEncodingHeader, tt.acceptEncoding)
 			}
 
 			rec := httptest.NewRecorder()
@@ -246,8 +249,8 @@ func BenchmarkGzipResponseTime(b *testing.B) {
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				req := httptest.NewRequest("GET", "/test-path", nil)
-				req.Header.Set("Accept-Encoding", "gzip")
+				req := httptest.NewRequest("GET", TestPath, nil)
+				req.Header.Set(AcceptEncodingHeader, "gzip")
 				rec := httptest.NewRecorder()
 				bm.middleware(handler).ServeHTTP(rec, req)
 
@@ -292,8 +295,8 @@ func BenchmarkGzipCompressionRatio(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				req := httptest.NewRequest("GET", "/test-path", nil)
-				req.Header.Set("Accept-Encoding", "gzip")
+				req := httptest.NewRequest("GET", TestPath, nil)
+				req.Header.Set(AcceptEncodingHeader, "gzip")
 				rec := httptest.NewRecorder()
 				mwCompressed(handler).ServeHTTP(rec, req)
 

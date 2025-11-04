@@ -349,11 +349,11 @@ Access real-time metrics at `http://localhost:9090/metrics` (Prometheus format)
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### 🧪 Local Development with Docker Compose
+### Local Development with Docker Compose
 
 Helios can be run locally with three Nginx backends using Docker Compose. This setup validates plugin behavior, health checks, and load balancing.
 
-#### 📦 Services
+#### Services
 
 | Service    | Port(s) | Description                              |
 | ---------- | ------- | ---------------------------------------- |
@@ -364,7 +364,7 @@ Helios can be run locally with three Nginx backends using Docker Compose. This s
 | `backend2` | 8082    | Nginx backend with default response      |
 | `backend3` | 8083    | Nginx backend with default response      |
 
-#### 🧱 Build Instructions
+#### Build Instructions
 
 1. Ensure Docker and Docker Compose are installed.
 2. Clone the repo and navigate to the root directory.
@@ -375,14 +375,15 @@ Helios can be run locally with three Nginx backends using Docker Compose. This s
    docker-compose up
    ```
 
-🔍 Health Check Behavior
+#### Health Check Behavior
 Helios performs active health checks on / for each backend every 10 seconds. Backends respond with:
 
 Backend is alive
 
 If a backend fails to respond, it is marked unhealthy for 30 seconds.
 
-🔐 Admin API
+#### Admin API
+
 The Admin API is exposed on port 9091 and requires a token (configured in helios.docker.yaml). It provides:
 
 - Backend status
@@ -391,14 +392,16 @@ The Admin API is exposed on port 9091 and requires a token (configured in helios
 
 - Circuit breaker metrics
 
-📊 Metrics
+#### Metrics
+
 Available at:
 
 - http://localhost:9090/metrics
 
 - http://localhost:9090/health
 
-🧩 Plugin Chain
+#### Plugin Chain
+
 The default plugin chain includes:
 
 - logging: request logs with trace IDs

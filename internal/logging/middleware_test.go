@@ -12,6 +12,13 @@ import (
 	"github.com/0xReLogic/Helios/internal/config"
 )
 
+const (
+	testCustomReqHeader   = "X-Custom-Req"
+	testCustomTraceHeader = "X-Custom-Trace"
+	testReqID             = "req-1"
+	testTraceID           = "trace-1"
+)
+
 func swapLoggerForTest(logger zerolog.Logger) func() {
 	baseLoggerMu.Lock()
 	previous := baseLogger
@@ -91,33 +98,33 @@ func TestRequestContextMiddleware_GeneratesIdentifiers(t *testing.T) {
 
 func TestRequestContextMiddleware_RespectsHeaders(t *testing.T) {
 	cfg := config.LoggingConfig{
-		RequestID: config.RequestIDConfig{Enabled: true, Header: "X-Custom-Req"},
-		Trace:     config.TraceConfig{Enabled: true, Header: "X-Custom-Trace"},
+		RequestID: config.RequestIDConfig{Enabled: true, Header: testCustomReqHeader},
+		Trace:     config.TraceConfig{Enabled: true, Header: testCustomTraceHeader},
 	}
 
 	mw := RequestContextMiddleware(cfg)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := RequestIDFromContext(r.Context()); got != "req-1" {
-			t.Fatalf("expected request id req-1, got %s", got)
+		if got := RequestIDFromContext(r.Context()); got != testReqID {
+			t.Fatalf("expected request id %s, got %s", testReqID, got)
 		}
-		if got := TraceIDFromContext(r.Context()); got != "trace-1" {
-			t.Fatalf("expected trace id trace-1, got %s", got)
+		if got := TraceIDFromContext(r.Context()); got != testTraceID {
+			t.Fatalf("expected trace id %s, got %s", testTraceID, got)
 		}
 		w.WriteHeader(http.StatusOK)
 	})
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Custom-Req", "req-1")
-	req.Header.Set("X-Custom-Trace", "trace-1")
+	req.Header.Set(testCustomReqHeader, testReqID)
+	req.Header.Set(testCustomTraceHeader, testTraceID)
 
 	mw(handler).ServeHTTP(rr, req)
 
-	if got := rr.Header().Get("X-Custom-Req"); got != "req-1" {
-		t.Fatalf("expected response header req-1, got %s", got)
+	if got := rr.Header().Get(testCustomReqHeader); got != testReqID {
+		t.Fatalf("expected response header %s, got %s", testReqID, got)
 	}
-	if got := rr.Header().Get("X-Custom-Trace"); got != "trace-1" {
-		t.Fatalf("expected response header trace-1, got %s", got)
+	if got := rr.Header().Get(testCustomTraceHeader); got != testTraceID {
+		t.Fatalf("expected response header %s, got %s", testTraceID, got)
 	}
 }
