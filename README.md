@@ -156,11 +156,11 @@ Helios is configured via `helios.yaml`:
 
 ```yaml
 server:
-  port: 8080
+  port: 8080 # Port for the proxy server
   tls:
-    enabled: true
-    certFile: "certs/cert.pem"
-    keyFile: "certs/key.pem"
+    enabled: true # Enable TLS/SSL termination
+    certFile: "certs/cert.pem" # Path to TLS certificate file
+    keyFile: "certs/key.pem" # Path to TLS private key file
 
 backends:
   - name: "server1"
@@ -202,8 +202,8 @@ circuit_breaker:
 
 admin_api:
   enabled: true
-  port: 9091
-  auth_token: "change-me"
+  port: 9091 # Port for admin API server
+  auth_token: "change-me" # JWT token for authentication (change in production)
 
 metrics:
   enabled: true
@@ -211,20 +211,35 @@ metrics:
   path: "/metrics" # Path for metrics endpoint
 
 logging:
-  level: "info" # debug, info, warn, error
-  format: "text" # text (default) or json
-  include_caller: true # include caller information in logs
+  level: "info" # Log level: debug, info, warn, error
+  format: "text" # Log format: text (console) or json (machine-readable)
+  include_caller: true # Include file and line number in logs
   request_id:
-    enabled: true
-    header: "X-Request-ID"
+    enabled: true # Auto-generate and propagate request IDs
+    header: "X-Request-ID" # Header name for request ID
   trace:
-    enabled: true
-    header: "X-Trace-ID"
+    enabled: true # Enable distributed tracing
+    header: "X-Trace-ID" # Header name for trace ID
 
 plugins:
   enabled: true
   chain:
     - name: logging
+    - name: size_limit
+      config:
+        max_request_body: 10485760 # 10MB in bytes
+        max_response_body: 52428800 # 50MB in bytes
+    - name: gzip
+      config:
+        level: 5 # Compression level (1-9, default: 5)
+        min_size: 1024 # Minimum response size to compress (bytes, default: 1024)
+        content_types:
+          - "text/html"
+          - "text/css"
+          - "text/plain"
+          - "application/json"
+          - "application/javascript"
+          - "application/xml"
     - name: headers
       config:
         set:
@@ -234,6 +249,44 @@ plugins:
 ```
 
 ## Quick Start
+
+### TLS/SSL Configuration
+
+Helios supports TLS termination for secure HTTPS connections. The repository includes sample certificates for testing purposes only.
+
+**WARNING: DO NOT use the included certificates in production. They are publicly available and insecure.**
+
+#### Generating Your Own Certificates
+
+For production use, generate your own TLS certificates:
+
+**Self-signed certificate (for testing):**
+```bash
+openssl req -x509 -newkey rsa:4096 -keyout certs/key.pem -out certs/cert.pem -days 365 -nodes -subj "/CN=localhost"
+```
+
+**Using Let's Encrypt (for production):**
+```bash
+# Install certbot
+sudo apt-get install certbot
+
+# Generate certificate
+sudo certbot certonly --standalone -d yourdomain.com
+
+# Copy certificates to Helios directory
+cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem certs/cert.pem
+cp /etc/letsencrypt/live/yourdomain.com/privkey.pem certs/key.pem
+```
+
+**Enable TLS in helios.yaml:**
+```yaml
+server:
+  port: 8080
+  tls:
+    enabled: true
+    certFile: "certs/cert.pem"
+    keyFile: "certs/key.pem"
+```
 
 ### Logging Configuration
 
