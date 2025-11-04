@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  helios:
+    build: .
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+      - "9091:9091"
+    volumes:
+      - ./helios.docker.yaml:/app/helios.docker.yaml
+      - ./certs:/app/certs
+    depends_on:
+      - backend1
+      - backend2
+      - backend3
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  backend1:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8081:80"
+
+  backend2:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8082:80"
+
+  backend3:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8083:80"

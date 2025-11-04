@@ -1,0 +1,8 @@
+.git
+*.md
+*.bat
+*.csv
+*.log
+*.test
+__pycache__/
+node_modules/

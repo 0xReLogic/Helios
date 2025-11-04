@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/github/license/0xReLogic/Helios)](https://github.com/0xReLogic/Helios/blob/main/LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/0xReLogic/Helios.svg)](https://pkg.go.dev/github.com/0xReLogic/Helios)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/0xReLogic/Helios/build.yml?branch=main)](https://github.com/0xReLogic/Helios/actions)
+
 </div>
 
 Ultra-fast, production-grade L7 reverse proxy and load balancer - simple, extensible, and reliable.
@@ -30,7 +31,7 @@ Helios is a modern, production-grade reverse proxy and load balancer for microse
   - Active health checks - Proactively monitors backend health with periodic requests
 - **Request Rate Limiting**: Token bucket algorithm to prevent abuse and ensure fair usage
 - **Circuit Breaker Pattern**: Prevents cascading failures by temporarily blocking requests to unhealthy services
-- **Metrics and Monitoring**: 
+- **Metrics and Monitoring**:
   - Real-time metrics collection and exposure
   - Health status endpoints
   - Backend performance monitoring
@@ -47,46 +48,46 @@ Helios is a modern, production-grade reverse proxy and load balancer for microse
 ```mermaid
 graph TD
     Client([Client]) -->|HTTP Request| RateLimit[Rate Limiter]
-    
+
     subgraph "Helios Load Balancer"
         RateLimit --> CircuitBreaker[Circuit Breaker]
         CircuitBreaker --> Helios[Helios Proxy]
         Helios --> LoadBalancer[Load Balancing Strategy]
         Helios --> HealthChecker[Health Checker]
         Helios --> MetricsCollector[Metrics Collector]
-        
+
         subgraph "Health Monitoring"
             HealthChecker --> PassiveChecks[Passive Health Checks]
             HealthChecker --> ActiveChecks[Active Health Checks]
         end
-        
+
         subgraph "Load Balancing Strategies"
             LoadBalancer --> RoundRobin[Round Robin]
             LoadBalancer --> LeastConn[Least Connections]
             LoadBalancer --> WeightedRR[Weighted Round Robin]
             LoadBalancer --> IPHash[IP Hash]
         end
-        
+
         subgraph "Monitoring & Metrics"
             MetricsCollector --> MetricsAPI[Metrics API :9090]
             MetricsCollector --> HealthAPI[Health API :9090]
         end
     end
-    
+
     Helios -->|Forward Request| Backend1[Backend Server 1]
     Helios -->|Forward Request| Backend2[Backend Server 2]
     Helios -->|Forward Request| Backend3[Backend Server 3]
-    
+
     ActiveChecks -.->|Health Probe| Backend1
     ActiveChecks -.->|Health Probe| Backend2
     ActiveChecks -.->|Health Probe| Backend3
-    
+
     Backend1 -->|Response| Helios
     Backend2 -->|Response| Helios
     Backend3 -->|Response| Helios
-    
+
     Helios -->|HTTP Response| Client
-    
+
     MetricsAPI -.->|Monitoring Data| Monitoring[Monitoring System]
     HealthAPI -.->|Health Status| Monitoring
 ```
@@ -103,12 +104,14 @@ graph TD
 #### From Source
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/0xReLogic/Helios.git
    cd Helios
    ```
 
 2. Build the project:
+
    ```bash
    go build -o helios.exe ./cmd/helios
    ```
@@ -171,31 +174,31 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "round_robin"  # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
-  
+  strategy: "round_robin" # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
+
 health_checks:
   active:
     enabled: true
-    interval: 5   # Interval in seconds
-    timeout: 3    # Timeout in seconds  
+    interval: 5 # Interval in seconds
+    timeout: 3 # Timeout in seconds
     path: "/health"
   passive:
     enabled: true
-    unhealthy_threshold: 10  # Number of failures before marking as unhealthy
-    unhealthy_timeout: 15    # Time in seconds to keep backend unhealthy
+    unhealthy_threshold: 10 # Number of failures before marking as unhealthy
+    unhealthy_timeout: 15 # Time in seconds to keep backend unhealthy
 
 rate_limit:
-  enabled: true            # Disabled by default
-  max_tokens: 100          # Maximum tokens in bucket
-  refill_rate_seconds: 1   # Refill rate in seconds
+  enabled: true # Disabled by default
+  max_tokens: 100 # Maximum tokens in bucket
+  refill_rate_seconds: 1 # Refill rate in seconds
 
 circuit_breaker:
   enabled: true
-  max_requests: 100        # Max requests in half-open state
-  interval_seconds: 30     # Time window for failure counting
-  timeout_seconds: 15      # Time to wait before moving from open to half-open
-  failure_threshold: 50    # Number of failures to open circuit
-  success_threshold: 10    # Number of successes to close circuit
+  max_requests: 100 # Max requests in half-open state
+  interval_seconds: 30 # Time window for failure counting
+  timeout_seconds: 15 # Time to wait before moving from open to half-open
+  failure_threshold: 50 # Number of failures to open circuit
+  success_threshold: 10 # Number of successes to close circuit
 
 admin_api:
   enabled: true
@@ -204,13 +207,13 @@ admin_api:
 
 metrics:
   enabled: true
-  port: 9090              # Port for metrics server
-  path: "/metrics"        # Path for metrics endpoint
+  port: 9090 # Port for metrics server
+  path: "/metrics" # Path for metrics endpoint
 
 logging:
-  level: "info"           # debug, info, warn, error
-  format: "text"          # text (default) or json
-  include_caller: true    # include caller information in logs
+  level: "info" # debug, info, warn, error
+  format: "text" # text (default) or json
+  include_caller: true # include caller information in logs
   request_id:
     enabled: true
     header: "X-Request-ID"
@@ -291,7 +294,7 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "round_robin"  # round_robin, least_connections, weighted_round_robin, ip_hash
+  strategy: "round_robin" # round_robin, least_connections, weighted_round_robin, ip_hash
 
 health_checks:
   active:
@@ -299,7 +302,7 @@ health_checks:
     interval: 5
     timeout: 3
     path: "/health"
-  
+
 circuit_breaker:
   enabled: true
   failure_threshold: 50
@@ -321,26 +324,88 @@ go build -o backend ./cmd/backend
 ## Monitoring & Management
 
 ### Metrics Endpoint
+
 Access real-time metrics at `http://localhost:9090/metrics` (Prometheus format)
 
 ### Admin API
+
 - Runtime backend management
-- Strategy switching  
+- Strategy switching
 - Health status monitoring
 - JWT-protected endpoints
 
 ### Health Checks
+
 - Active: Periodic backend health verification
 - Passive: Request-based health tracking
 - Circuit breaker: Automatic failure isolation
 
 ## Documentation
+
 - [Plugin Development Guide](docs/plugin-development.md) - Learn how to create custom plugins
   - Example plugins: `internal/plugins/examples`
 
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### 🧪 Local Development with Docker Compose
+
+Helios can be run locally with three Nginx backends using Docker Compose. This setup validates plugin behavior, health checks, and load balancing.
+
+#### 📦 Services
+
+| Service    | Port(s) | Description                              |
+| ---------- | ------- | ---------------------------------------- |
+| `helios`   | 8080    | Load balancer entrypoint                 |
+|            | 9090    | Metrics endpoint (`/metrics`, `/health`) |
+|            | 9091    | Admin API (token-protected)              |
+| `backend1` | 8081    | Nginx backend with default response      |
+| `backend2` | 8082    | Nginx backend with default response      |
+| `backend3` | 8083    | Nginx backend with default response      |
+
+#### 🧱 Build Instructions
+
+1. Ensure Docker and Docker Compose are installed.
+2. Clone the repo and navigate to the root directory.
+3. Build and launch:
+
+   ```bash
+   docker-compose build --no-cache
+   docker-compose up
+   ```
+
+🔍 Health Check Behavior
+Helios performs active health checks on / for each backend every 10 seconds. Backends respond with:
+
+Backend is alive
+
+If a backend fails to respond, it is marked unhealthy for 30 seconds.
+
+🔐 Admin API
+The Admin API is exposed on port 9091 and requires a token (configured in helios.docker.yaml). It provides:
+
+- Backend status
+
+- Plugin chain inspection
+
+- Circuit breaker metrics
+
+📊 Metrics
+Available at:
+
+- http://localhost:9090/metrics
+
+- http://localhost:9090/health
+
+🧩 Plugin Chain
+The default plugin chain includes:
+
+- logging: request logs with trace IDs
+
+- size_limit: enforces payload size
+
+- headers: injects custom headers
 
 ## License
 
@@ -350,10 +415,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contributors
 
-Thanks to all the amazing people who have contributed to Helios! 
+Thanks to all the amazing people who have contributed to Helios!
 
 <a href="https://github.com/0xReLogic/Helios/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=0xReLogic/Helios" />
 </a>
-
-
