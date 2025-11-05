@@ -13,6 +13,12 @@ import (
 	logging "github.com/0xReLogic/Helios/internal/logging"
 )
 
+const (
+	// MaxCompressionBufferSize prevents DoS attacks via excessive memory buffering
+	// 10MB limit - responses larger than this will be streamed uncompressed
+	MaxCompressionBufferSize = 10 * 1024 * 1024 // 10MB
+)
+
 type gzipResponseWriter struct {
 	http.ResponseWriter
 	statusCode   int
@@ -21,7 +27,8 @@ type gzipResponseWriter struct {
 	level        int
 	contentTypes []string
 
-	buf bytes.Buffer
+	buf          bytes.Buffer
+	bufferExceeded bool // Track if we exceeded max buffer size
 }
 
 func (g *gzipResponseWriter) WriteHeader(code int) {
@@ -35,6 +42,20 @@ func (g *gzipResponseWriter) WriteHeader(code int) {
 }
 
 func (g *gzipResponseWriter) Write(b []byte) (int, error) {
+	// Check if adding this data would exceed max buffer size
+	if g.buf.Len()+len(b) > MaxCompressionBufferSize {
+		// Mark as exceeded and fall back to streaming uncompressed
+		if !g.bufferExceeded {
+			g.bufferExceeded = true
+			// Flush existing buffer uncompressed
+			if g.buf.Len() > 0 {
+				g.ResponseWriter.Write(g.buf.Bytes())
+				g.buf.Reset()
+			}
+		}
+		// Stream directly without compression
+		return g.ResponseWriter.Write(b)
+	}
 	return g.buf.Write(b)
 }
 
@@ -54,6 +75,11 @@ func (g *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 func (g *gzipResponseWriter) Finish() error {
 	if !g.wroteHeader {
 		g.WriteHeader(http.StatusOK)
+	}
+
+	// If buffer was exceeded, data was already streamed uncompressed
+	if g.bufferExceeded {
+		return nil
 	}
 
 	body := g.buf.Bytes()

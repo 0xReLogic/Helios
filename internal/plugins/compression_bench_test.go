@@ -2,8 +2,13 @@ package plugins
 
 import (
 	"bytes"
+	"compress/gzip"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/0xReLogic/Helios/internal/config"
 )
 
 // Benchmark old implementation (bytes conversion)
@@ -188,6 +193,92 @@ func TestMatchesContentType(t *testing.T) {
 			result := matchesContentType(tt.ct, tt.allowed)
 			if result != tt.expected {
 				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestGzipMaxBufferSize(t *testing.T) {
+	tests := []struct {
+		name         string
+		responseSize int
+		shouldCompress bool
+	}{
+		{
+			name:         "Small response - should compress",
+			responseSize: 1024, // 1KB
+			shouldCompress: true,
+		},
+		{
+			name:         "Medium response - should compress",
+			responseSize: 1024 * 1024, // 1MB
+			shouldCompress: true,
+		},
+		{
+			name:         "Large response under limit - should compress",
+			responseSize: 9 * 1024 * 1024, // 9MB
+			shouldCompress: true,
+		},
+		{
+			name:         "Large response over limit - should NOT compress",
+			responseSize: 11 * 1024 * 1024, // 11MB > 10MB limit
+			shouldCompress: false,
+		},
+		{
+			name:         "Very large response - should NOT compress",
+			responseSize: 50 * 1024 * 1024, // 50MB
+			shouldCompress: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Build plugin chain with gzip
+			pluginConfig := config.PluginsConfig{
+				Enabled: true,
+				Chain: []config.PluginConfig{
+					{
+						Name: "gzip",
+						Config: map[string]interface{}{
+							"level":         float64(gzip.BestSpeed),
+							"min_size":      float64(100),
+							"content_types": []interface{}{"application/json"},
+						},
+					},
+				},
+			}
+
+			baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// Create large response body
+				largeBody := bytes.Repeat([]byte("x"), tt.responseSize)
+				w.Write(largeBody)
+			})
+
+			handler, err := BuildChain(pluginConfig, baseHandler)
+			if err != nil {
+				t.Fatalf("Failed to build plugin chain: %v", err)
+			}
+
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set("Accept-Encoding", "gzip")
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			isCompressed := rec.Header().Get("Content-Encoding") == "gzip"
+
+			if tt.shouldCompress && !isCompressed {
+				t.Errorf("Expected response to be compressed but it wasn't (size: %d bytes)", tt.responseSize)
+			}
+
+			if !tt.shouldCompress && isCompressed {
+				t.Errorf("Expected response to NOT be compressed but it was (size: %d bytes)", tt.responseSize)
+			}
+
+			// Verify response was written
+			if rec.Body.Len() == 0 {
+				t.Error("Response body is empty")
 			}
 		})
 	}
