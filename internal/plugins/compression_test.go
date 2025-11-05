@@ -48,7 +48,11 @@ func decompressBody(t *testing.T, data []byte) string {
 	if err != nil {
 		t.Fatalf("failed to create gzip reader: %v", err)
 	}
-	defer gzr.Close()
+	defer func() {
+		if err := gzr.Close(); err != nil {
+			t.Logf("failed to close gzip reader: %v", err)
+		}
+	}()
 
 	decompressedBody, err := io.ReadAll(gzr)
 	if err != nil {

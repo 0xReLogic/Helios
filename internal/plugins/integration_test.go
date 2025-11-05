@@ -106,7 +106,11 @@ func TestPluginChainIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create gzip reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Logf("failed to close gzip reader: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(reader)
 	if err != nil {
@@ -476,7 +480,11 @@ func TestComplexPluginChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create gzip reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Logf("failed to close gzip reader: %v", err)
+		}
+	}()
 
 	responseBody, err := io.ReadAll(reader)
 	if err != nil {

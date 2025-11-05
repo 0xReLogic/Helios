@@ -48,7 +48,11 @@ health_checks:
 	if err != nil {
 		t.Fatalf(testFailedCreateTempFile, err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer func() {
+		if err := os.Remove(tempFile.Name()); err != nil {
+			t.Logf("failed to remove temp file: %v", err)
+		}
+	}()
 
 	if _, err := tempFile.Write([]byte(configContent)); err != nil {
 		t.Fatalf(testFailedWriteTempFile, err)
@@ -128,7 +132,11 @@ backends:
 	if err != nil {
 		t.Fatalf(testFailedCreateTempFile, err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer func() {
+		if err := os.Remove(tempFile.Name()); err != nil {
+			t.Logf("failed to remove temp file: %v", err)
+		}
+	}()
 
 	if _, err := tempFile.Write([]byte(configContent)); err != nil {
 		t.Fatalf(testFailedWriteTempFile, err)
@@ -162,7 +170,11 @@ func TestLoadConfigError(t *testing.T) {
 	if err != nil {
 		t.Fatalf(testFailedCreateTempFile, err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer func() {
+		if err := os.Remove(tempFile.Name()); err != nil {
+			t.Logf("failed to remove temp file: %v", err)
+		}
+	}()
 
 	if _, err := tempFile.Write([]byte("invalid: yaml: content:")); err != nil {
 		t.Fatalf(testFailedWriteTempFile, err)

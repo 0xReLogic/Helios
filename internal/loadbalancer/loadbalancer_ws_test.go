@@ -20,7 +20,9 @@ func setupWebSocketTestBackend() *httptest.Server {
 			if err != nil {
 				return
 			}
-			defer conn.Close()
+			defer func() {
+				_ = conn.Close() // Best effort close, ignore error in test setup
+			}()
 			for {
 				mt, message, err := conn.ReadMessage()
 				if err != nil {
@@ -74,7 +76,11 @@ func TestWebSocketProxy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to dial websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Logf("failed to close websocket connection: %v", err)
+		}
+	}()
 
 	// 4. Send a message and check for echo
 	testMessage := "Hello, WebSocket!"

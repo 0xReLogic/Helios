@@ -115,7 +115,12 @@ func (g *gzipResponseWriter) Finish() error {
 	if err != nil {
 		return err
 	}
-	defer gz.Close()
+	defer func() {
+		if err := gz.Close(); err != nil {
+			// Log the error but don't fail the request
+			_ = err // Explicitly ignore
+		}
+	}()
 
 	_, err = gz.Write(body)
 	if err != nil {

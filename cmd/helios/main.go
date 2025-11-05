@@ -256,7 +256,9 @@ func main() {
 		// Shutdown HTTP server
 		if err := server.Shutdown(ctx); err != nil {
 			logger.Error().Err(err).Msg("error during server shutdown")
-			server.Close()
+			if closeErr := server.Close(); closeErr != nil {
+				logger.Error().Err(closeErr).Msg("error closing server")
+			}
 		}
 
 		// Stop load balancer

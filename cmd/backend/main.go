@@ -35,7 +35,11 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		logging.WithContext(r.Context()).Error().Err(err).Msg("failed to upgrade to websocket")
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logging.L().Error().Err(err).Msg("failed to close websocket connection")
+		}
+	}()
 
 	logging.WithContext(r.Context()).Info().Msg("websocket connection established")
 
@@ -75,11 +79,11 @@ func main() {
 		if *failRate > 0 && (secureRandomInt(100) < *failRate) {
 			requestLogger.Warn().Msg("simulating failure")
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Simulated failure from Backend Server %s!\n", *serverID)
+			_, _ = fmt.Fprintf(w, "Simulated failure from Backend Server %s!\n", *serverID)
 			return
 		}
 
-		fmt.Fprintf(w, "Hello from Backend Server %s! You requested: %s\n", *serverID, r.URL.Path)
+		_, _ = fmt.Fprintf(w, "Hello from Backend Server %s! You requested: %s\n", *serverID, r.URL.Path)
 	})
 
 	// Add a health check endpoint
@@ -88,12 +92,12 @@ func main() {
 		if *failRate > 0 && (secureRandomInt(100) < *failRate) {
 			logging.WithContext(r.Context()).Warn().Str("backend", *serverID).Msg("health check failing")
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Health check failed from Server %s", *serverID)
+			_, _ = fmt.Fprintf(w, "Health check failed from Server %s", *serverID)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "OK from Server %s", *serverID)
+		_, _ = fmt.Fprintf(w, "OK from Server %s", *serverID)
 	})
 
 	// Add a fail endpoint for testing health checks
@@ -102,7 +106,7 @@ func main() {
 
 		// Return 500 error to trigger health check failure
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Manual failure triggered on Server %s", *serverID)
+		_, _ = fmt.Fprintf(w, "Manual failure triggered on Server %s", *serverID)
 	})
 
 	// Add a websocket echo endpoint

@@ -76,7 +76,7 @@ func parseFormat(value string) logFormat {
 }
 
 func newLogger(writer io.Writer, level zerolog.Level, format logFormat, includeCaller bool) zerolog.Logger {
-	var output io.Writer = writer
+	output := writer
 	if format == formatText {
 		cw := zerolog.ConsoleWriter{
 			Out:        writer,

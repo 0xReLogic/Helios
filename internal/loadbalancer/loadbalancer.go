@@ -367,7 +367,11 @@ func (lb *LoadBalancer) checkBackendHealth(backend *Backend) {
 		lb.MarkBackendUnhealthy(backend, lb.healthChecks.passiveTimeout)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.L().Error().Err(err).Msg("failed to close response body")
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		logging.L().Warn().Str("backend", backend.Name).Int("status", resp.StatusCode).Msg("health check returned non-ok status")
@@ -607,11 +611,12 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Uint32("total_requests", requestCount).
 				Msg("circuit breaker execution failed")
 
-			if err == circuitbreaker.ErrCircuitBreakerOpen {
+			switch err {
+			case circuitbreaker.ErrCircuitBreakerOpen:
 				http.Error(w, fmt.Sprintf("Service temporarily unavailable - circuit breaker is open (failures: %d, requests: %d)", failureCount, requestCount), http.StatusServiceUnavailable)
-			} else if err == circuitbreaker.ErrTooManyRequests {
+			case circuitbreaker.ErrTooManyRequests:
 				http.Error(w, fmt.Sprintf("Too many requests - circuit breaker half-open (successes: %d)", successCount), http.StatusTooManyRequests)
-			} else {
+			default:
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
 			lb.metricsCollector.RecordResponse(false, time.Since(startTime))

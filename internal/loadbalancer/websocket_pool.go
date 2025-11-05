@@ -68,7 +68,7 @@ func (p *WebSocketPool) Get(backend string) net.Conn {
 
 		// Check if connection is still valid and not stale
 		if time.Since(pc.lastUsed) > pool.idleTimeout {
-			pc.conn.Close()
+			_ = pc.conn.Close() // Best effort close, ignore error
 			continue
 		}
 
@@ -192,7 +192,7 @@ func (p *WebSocketPool) cleanup() {
 
 		for _, pc := range pool.idle {
 			if time.Since(pc.lastUsed) > pool.idleTimeout {
-				pc.conn.Close()
+				_ = pc.conn.Close() // Best effort close, ignore error
 				closedCount++
 			} else {
 				validConns = append(validConns, pc)
@@ -220,7 +220,7 @@ func (p *WebSocketPool) Shutdown() {
 	for backend, pool := range p.pools {
 		pool.mu.Lock()
 		for _, pc := range pool.idle {
-			pc.conn.Close()
+			_ = pc.conn.Close() // Best effort close, ignore error
 		}
 		pool.idle = nil
 		pool.mu.Unlock()
