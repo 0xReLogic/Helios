@@ -8,10 +8,18 @@ import (
 	"github.com/0xReLogic/Helios/internal/utils"
 )
 
+// Test constants to avoid duplication
+const (
+	testClientIP  = "192.168.1.100"
+	testXFFIP     = "203.0.113.195"
+
+	testRemoteAddr = "10.0.0.1:1234")
+
+
 func TestTokenBucketRateLimiter(t *testing.T) {
 	// Create a rate limiter with 5 tokens that refills every 100ms
 	rl := NewTokenBucketRateLimiter(5, 100*time.Millisecond)
-	clientIP := "192.168.1.100"
+	clientIP := testClientIP
 
 	// Should allow 5 requests initially
 	for i := 0; i < 5; i++ {
@@ -35,7 +43,7 @@ func TestTokenBucketRateLimiter(t *testing.T) {
 func TestTokenBucketRateLimiterDifferentClients(t *testing.T) {
 	rl := NewTokenBucketRateLimiter(2, 100*time.Millisecond)
 
-	client1 := "192.168.1.100"
+	client1 := testClientIP
 	client2 := "192.168.1.101"
 
 	// Both clients should be able to make 2 requests
@@ -59,7 +67,7 @@ func TestTokenBucketRateLimiterDifferentClients(t *testing.T) {
 
 func TestTokenBucketRefill(t *testing.T) {
 	rl := NewTokenBucketRateLimiter(1, 50*time.Millisecond)
-	clientIP := "192.168.1.100"
+	clientIP := testClientIP
 
 	// Use up the initial token
 	if !rl.Allow(clientIP) {
@@ -92,50 +100,50 @@ func TestGetClientIP(t *testing.T) {
 	}{
 		{
 			name:        "X-Forwarded-For with single IP",
-			xff:         "203.0.113.195",
-			remoteAddr:  "10.0.0.1:1234",
-			expectedIP:  "203.0.113.195",
+			xff:         testXFFIP,
+			remoteAddr:  testRemoteAddr,
+			expectedIP:  testXFFIP,
 			description: "Should extract single IP from XFF",
 		},
 		{
 			name:        "X-Forwarded-For with multiple IPs",
 			xff:         "203.0.113.195, 70.41.3.18, 150.172.238.178",
-			remoteAddr:  "10.0.0.1:1234",
-			expectedIP:  "203.0.113.195",
+			remoteAddr:  testRemoteAddr,
+			expectedIP:  testXFFIP,
 			description: "Should extract FIRST IP from comma-separated XFF list (actual client)",
 		},
 		{
 			name:        "X-Forwarded-For with spaces",
 			xff:         "  203.0.113.195  ,  70.41.3.18  ",
-			remoteAddr:  "10.0.0.1:1234",
-			expectedIP:  "203.0.113.195",
+			remoteAddr:  testRemoteAddr,
+			expectedIP:  testXFFIP,
 			description: "Should trim whitespace from XFF",
 		},
 		{
 			name:        "X-Real-IP when no XFF",
-			xri:         "203.0.113.195",
-			remoteAddr:  "10.0.0.1:1234",
-			expectedIP:  "203.0.113.195",
+			xri:         testXFFIP,
+			remoteAddr:  testRemoteAddr,
+			expectedIP:  testXFFIP,
 			description: "Should use X-Real-IP when XFF is absent",
 		},
 		{
 			name:        "X-Forwarded-For takes precedence over X-Real-IP",
-			xff:         "203.0.113.195",
+			xff:         testXFFIP,
 			xri:         "70.41.3.18",
-			remoteAddr:  "10.0.0.1:1234",
-			expectedIP:  "203.0.113.195",
+			remoteAddr:  testRemoteAddr,
+			expectedIP:  testXFFIP,
 			description: "XFF should be preferred over X-Real-IP",
 		},
 		{
 			name:        "RemoteAddr fallback with port",
 			remoteAddr:  "203.0.113.195:56789",
-			expectedIP:  "203.0.113.195",
+			expectedIP:  testXFFIP,
 			description: "Should extract IP from RemoteAddr, stripping port",
 		},
 		{
 			name:        "RemoteAddr fallback without port",
-			remoteAddr:  "203.0.113.195",
-			expectedIP:  "203.0.113.195",
+			remoteAddr:  testXFFIP,
+			expectedIP:  testXFFIP,
 			description: "Should handle RemoteAddr without port",
 		},
 		{

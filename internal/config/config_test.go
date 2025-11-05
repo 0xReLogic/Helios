@@ -6,6 +6,18 @@ import (
 	"testing"
 )
 
+// Test constants to avoid duplication
+const (
+	testFailedCreateTempFile = "Failed to create temp file: %v"
+	testFailedWriteTempFile  = "Failed to write to temp file: %v"
+	testFailedCloseTempFile  = "Failed to close temp file: %v"
+	testLocalhostHTTP        = "http://localhost:8080"
+	testValidateError        = "Validate() error = %v, wantErr %v"
+	testValidConfig          = "valid config"
+	testHealthPath           = "/health"
+	testZeroTimeout          = "zero timeout"
+)
+
 func TestLoadConfig(t *testing.T) {
 	// Create a temporary config file
 	configContent := `
@@ -34,15 +46,15 @@ health_checks:
 `
 	tempFile, err := os.CreateTemp("", "helios-config-*.yaml")
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+		t.Fatalf(testFailedCreateTempFile, err)
 	}
 	defer os.Remove(tempFile.Name())
 
 	if _, err := tempFile.Write([]byte(configContent)); err != nil {
-		t.Fatalf("Failed to write to temp file: %v", err)
+		t.Fatalf(testFailedWriteTempFile, err)
 	}
 	if err := tempFile.Close(); err != nil {
-		t.Fatalf("Failed to close temp file: %v", err)
+		t.Fatalf(testFailedCloseTempFile, err)
 	}
 
 	// Load the config
@@ -114,15 +126,15 @@ backends:
 `
 	tempFile, err := os.CreateTemp("", "helios-config-minimal-*.yaml")
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+		t.Fatalf(testFailedCreateTempFile, err)
 	}
 	defer os.Remove(tempFile.Name())
 
 	if _, err := tempFile.Write([]byte(configContent)); err != nil {
-		t.Fatalf("Failed to write to temp file: %v", err)
+		t.Fatalf(testFailedWriteTempFile, err)
 	}
 	if err := tempFile.Close(); err != nil {
-		t.Fatalf("Failed to close temp file: %v", err)
+		t.Fatalf(testFailedCloseTempFile, err)
 	}
 
 	// Load the config
@@ -148,15 +160,15 @@ func TestLoadConfigError(t *testing.T) {
 	// Test with invalid YAML
 	tempFile, err := os.CreateTemp("", "helios-config-invalid-*.yaml")
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+		t.Fatalf(testFailedCreateTempFile, err)
 	}
 	defer os.Remove(tempFile.Name())
 
 	if _, err := tempFile.Write([]byte("invalid: yaml: content:")); err != nil {
-		t.Fatalf("Failed to write to temp file: %v", err)
+		t.Fatalf(testFailedWriteTempFile, err)
 	}
 	if err := tempFile.Close(); err != nil {
-		t.Fatalf("Failed to close temp file: %v", err)
+		t.Fatalf(testFailedCloseTempFile, err)
 	}
 
 	_, err = LoadConfig(tempFile.Name())
@@ -189,7 +201,7 @@ func TestValidateInvalidServerPort(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:   ServerConfig{Port: tt.port},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 			}
 			err := cfg.Validate()
 			if err == nil {
@@ -205,10 +217,10 @@ func TestValidateBackendConfiguration(t *testing.T) {
 		backend BackendConfig
 		wantErr bool
 	}{
-		{"valid backend", BackendConfig{Name: "test", Address: "http://localhost:8080", Weight: 1}, false},
-		{"missing name", BackendConfig{Address: "http://localhost:8080"}, true},
+		{"valid backend", BackendConfig{Name: "test", Address: testLocalhostHTTP, Weight: 1}, false},
+		{"missing name", BackendConfig{Address: testLocalhostHTTP}, true},
 		{"missing address", BackendConfig{Name: "test"}, true},
-		{"negative weight", BackendConfig{Name: "test", Address: "http://localhost:8080", Weight: -1}, true},
+		{"negative weight", BackendConfig{Name: "test", Address: testLocalhostHTTP, Weight: -1}, true},
 	}
 
 	for _, tt := range tests {
@@ -219,7 +231,7 @@ func TestValidateBackendConfiguration(t *testing.T) {
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -241,11 +253,11 @@ func TestValidateTLSConfiguration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:   ServerConfig{Port: 8080, TLS: tt.tls},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -269,12 +281,12 @@ func TestValidateLoadBalancerStrategy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:       ServerConfig{Port: 8080},
-				Backends:     []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends:     []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				LoadBalancer: LoadBalancerConfig{Strategy: tt.strategy},
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -293,7 +305,7 @@ func TestValidateWebSocketPool(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid config",
+			name: testValidConfig,
 			config: WebSocketPoolConfig{
 				Enabled:            true,
 				MaxIdle:            10,
@@ -362,7 +374,7 @@ func TestValidateWebSocketPool(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:   ServerConfig{Port: 8080},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				LoadBalancer: LoadBalancerConfig{
 					Strategy:      "round_robin",
 					WebSocketPool: tt.config,
@@ -370,7 +382,7 @@ func TestValidateWebSocketPool(t *testing.T) {
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 			if tt.wantErr && err != nil && tt.errMsg != "" {
 				if !strings.Contains(err.Error(), tt.errMsg) {
@@ -545,11 +557,11 @@ func TestValidateTimeoutConfig(t *testing.T) {
 					Port:     8080,
 					Timeouts: tt.config,
 				},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 			if tt.wantErr && err != nil && tt.errMsg != "" {
 				if !strings.Contains(err.Error(), tt.errMsg) {
@@ -567,10 +579,10 @@ func TestValidateActiveHealthChecks(t *testing.T) {
 		wantErr bool
 	}{
 		{"disabled", ActiveHealthCheckConfig{Enabled: false}, false},
-		{"valid config", ActiveHealthCheckConfig{Enabled: true, Interval: 10, Timeout: 5, Path: "/health"}, false},
-		{"zero interval", ActiveHealthCheckConfig{Enabled: true, Interval: 0, Timeout: 5, Path: "/health"}, true},
-		{"zero timeout", ActiveHealthCheckConfig{Enabled: true, Interval: 10, Timeout: 0, Path: "/health"}, true},
-		{"timeout >= interval", ActiveHealthCheckConfig{Enabled: true, Interval: 5, Timeout: 10, Path: "/health"}, true},
+		{testValidConfig, ActiveHealthCheckConfig{Enabled: true, Interval: 10, Timeout: 5, Path: testHealthPath}, false},
+		{"zero interval", ActiveHealthCheckConfig{Enabled: true, Interval: 0, Timeout: 5, Path: testHealthPath}, true},
+		{testZeroTimeout, ActiveHealthCheckConfig{Enabled: true, Interval: 10, Timeout: 0, Path: testHealthPath}, true},
+		{"timeout >= interval", ActiveHealthCheckConfig{Enabled: true, Interval: 5, Timeout: 10, Path: testHealthPath}, true},
 		{"missing path", ActiveHealthCheckConfig{Enabled: true, Interval: 10, Timeout: 5}, true},
 	}
 
@@ -578,14 +590,14 @@ func TestValidateActiveHealthChecks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:   ServerConfig{Port: 8080},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				HealthChecks: HealthChecksConfig{
 					Active: tt.config,
 				},
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -598,23 +610,23 @@ func TestValidatePassiveHealthChecks(t *testing.T) {
 		wantErr bool
 	}{
 		{"disabled", PassiveHealthCheckConfig{Enabled: false}, false},
-		{"valid config", PassiveHealthCheckConfig{Enabled: true, UnhealthyThreshold: 3, UnhealthyTimeout: 30}, false},
+		{testValidConfig, PassiveHealthCheckConfig{Enabled: true, UnhealthyThreshold: 3, UnhealthyTimeout: 30}, false},
 		{"zero threshold", PassiveHealthCheckConfig{Enabled: true, UnhealthyThreshold: 0, UnhealthyTimeout: 30}, true},
-		{"zero timeout", PassiveHealthCheckConfig{Enabled: true, UnhealthyThreshold: 3, UnhealthyTimeout: 0}, true},
+		{testZeroTimeout, PassiveHealthCheckConfig{Enabled: true, UnhealthyThreshold: 3, UnhealthyTimeout: 0}, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:   ServerConfig{Port: 8080},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				HealthChecks: HealthChecksConfig{
 					Passive: tt.config,
 				},
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -627,7 +639,7 @@ func TestValidateRateLimit(t *testing.T) {
 		wantErr bool
 	}{
 		{"disabled", RateLimitConfig{Enabled: false}, false},
-		{"valid config", RateLimitConfig{Enabled: true, MaxTokens: 100, RefillRate: 1}, false},
+		{testValidConfig, RateLimitConfig{Enabled: true, MaxTokens: 100, RefillRate: 1}, false},
 		{"zero max tokens", RateLimitConfig{Enabled: true, MaxTokens: 0, RefillRate: 1}, true},
 		{"zero refill rate", RateLimitConfig{Enabled: true, MaxTokens: 100, RefillRate: 0}, true},
 	}
@@ -636,12 +648,12 @@ func TestValidateRateLimit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:    ServerConfig{Port: 8080},
-				Backends:  []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends:  []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				RateLimit: tt.config,
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -654,10 +666,10 @@ func TestValidateCircuitBreaker(t *testing.T) {
 		wantErr bool
 	}{
 		{"disabled", CircuitBreakerConfig{Enabled: false}, false},
-		{"valid config", CircuitBreakerConfig{Enabled: true, FailureThreshold: 5, SuccessThreshold: 2, TimeoutSeconds: 60, IntervalSeconds: 30}, false},
+		{testValidConfig, CircuitBreakerConfig{Enabled: true, FailureThreshold: 5, SuccessThreshold: 2, TimeoutSeconds: 60, IntervalSeconds: 30}, false},
 		{"zero failure threshold", CircuitBreakerConfig{Enabled: true, FailureThreshold: 0, SuccessThreshold: 2, TimeoutSeconds: 60, IntervalSeconds: 30}, true},
 		{"zero success threshold", CircuitBreakerConfig{Enabled: true, FailureThreshold: 5, SuccessThreshold: 0, TimeoutSeconds: 60, IntervalSeconds: 30}, true},
-		{"zero timeout", CircuitBreakerConfig{Enabled: true, FailureThreshold: 5, SuccessThreshold: 2, TimeoutSeconds: 0, IntervalSeconds: 30}, true},
+		{testZeroTimeout, CircuitBreakerConfig{Enabled: true, FailureThreshold: 5, SuccessThreshold: 2, TimeoutSeconds: 0, IntervalSeconds: 30}, true},
 		{"zero interval", CircuitBreakerConfig{Enabled: true, FailureThreshold: 5, SuccessThreshold: 2, TimeoutSeconds: 60, IntervalSeconds: 0}, true},
 	}
 
@@ -665,12 +677,12 @@ func TestValidateCircuitBreaker(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:         ServerConfig{Port: 8080},
-				Backends:       []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends:       []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				CircuitBreaker: tt.config,
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -683,7 +695,7 @@ func TestValidateMetrics(t *testing.T) {
 		wantErr bool
 	}{
 		{"disabled", MetricsConfig{Enabled: false}, false},
-		{"valid config", MetricsConfig{Enabled: true, Port: 9090, Path: "/metrics"}, false},
+		{testValidConfig, MetricsConfig{Enabled: true, Port: 9090, Path: "/metrics"}, false},
 		{"invalid port", MetricsConfig{Enabled: true, Port: 0, Path: "/metrics"}, true},
 		{"missing path", MetricsConfig{Enabled: true, Port: 9090}, true},
 	}
@@ -692,12 +704,12 @@ func TestValidateMetrics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:   ServerConfig{Port: 8080},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				Metrics:  tt.config,
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -710,7 +722,7 @@ func TestValidateAdminAPI(t *testing.T) {
 		wantErr bool
 	}{
 		{"disabled", AdminAPIConfig{Enabled: false}, false},
-		{"valid config", AdminAPIConfig{Enabled: true, Port: 8081}, false},
+		{testValidConfig, AdminAPIConfig{Enabled: true, Port: 8081}, false},
 		{"invalid port", AdminAPIConfig{Enabled: true, Port: 0}, true},
 	}
 
@@ -718,12 +730,12 @@ func TestValidateAdminAPI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:   ServerConfig{Port: 8080},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				AdminAPI: tt.config,
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}
@@ -745,12 +757,12 @@ func TestValidateLogging(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Server:   ServerConfig{Port: 8080},
-				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				Backends: []BackendConfig{{Name: "test", Address: testLocalhostHTTP}},
 				Logging:  tt.config,
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf(testValidateError, err, tt.wantErr)
 			}
 		})
 	}

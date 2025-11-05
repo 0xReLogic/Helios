@@ -12,11 +12,31 @@ import (
 	"github.com/0xReLogic/Helios/internal/config"
 )
 
+// Test constants to avoid duplication
+const (
+	testContentType           = "Content-Type"
+	testTextPlain             = "text/plain"
+	testApplicationJSON       = "application/json"
+	testCustomHeader          = "X-Custom-Header"
+	testServerHeader          = "X-Server"
+	testFailedBuildPlugin     = "Failed to build plugin chain: %v"
+	testAcceptEncoding        = "Accept-Encoding"
+	testExpectedStatus200     = "Expected status 200, got %d"
+	testContentEncoding       = "Content-Encoding"
+	testCustomAuth            = "custom-auth"
+	testAPIKey                = "X-API-Key"
+	testOrderHeader           = "X-Order"
+	testShouldNotExistHeader  = "X-Should-Not-Exist"
+	testAPIVersionHeader      = "X-API-Version"
+	testPoweredByHeader       = "X-Powered-By"
+)
+
+
 // TestPluginChainIntegration tests the complete plugin chain with multiple plugins
 func TestPluginChainIntegration(t *testing.T) {
 	// Create a base handler that returns a simple response
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set(testContentType, testTextPlain)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("Hello from base handler"))
 	})
@@ -29,8 +49,8 @@ func TestPluginChainIntegration(t *testing.T) {
 				Name: "headers",
 				Config: map[string]interface{}{
 					"set": map[string]interface{}{
-						"X-Custom-Header": "test-value",
-						"X-Server":        "Helios",
+						testCustomHeader: "test-value",
+						testServerHeader:        "Helios",
 					},
 				},
 			},
@@ -43,7 +63,7 @@ func TestPluginChainIntegration(t *testing.T) {
 				Config: map[string]interface{}{
 					"level":         float64(5),
 					"min_size":      float64(0),
-					"content_types": []interface{}{"text/plain", "application/json"},
+					"content_types": []interface{}{testTextPlain, testApplicationJSON},
 				},
 			},
 		},
@@ -52,12 +72,12 @@ func TestPluginChainIntegration(t *testing.T) {
 	// Build the chain
 	handler, err := BuildChain(pluginConfig, baseHandler)
 	if err != nil {
-		t.Fatalf("Failed to build plugin chain: %v", err)
+		t.Fatalf(testFailedBuildPlugin, err)
 	}
 
 	// Create a request with gzip support
 	req := httptest.NewRequest("GET", "/test", nil)
-	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set(testAcceptEncoding, "gzip")
 	rec := httptest.NewRecorder()
 
 	// Execute the request
@@ -65,20 +85,20 @@ func TestPluginChainIntegration(t *testing.T) {
 
 	// Verify status code
 	if rec.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", rec.Code)
+		t.Errorf(testExpectedStatus200, rec.Code)
 	}
 
 	// Verify custom headers were added
-	if rec.Header().Get("X-Custom-Header") != "test-value" {
-		t.Errorf("Expected X-Custom-Header to be 'test-value', got '%s'", rec.Header().Get("X-Custom-Header"))
+	if rec.Header().Get(testCustomHeader) != "test-value" {
+		t.Errorf("Expected X-Custom-Header to be 'test-value', got '%s'", rec.Header().Get(testCustomHeader))
 	}
-	if rec.Header().Get("X-Server") != "Helios" {
-		t.Errorf("Expected X-Server to be 'Helios', got '%s'", rec.Header().Get("X-Server"))
+	if rec.Header().Get(testServerHeader) != "Helios" {
+		t.Errorf("Expected X-Server to be 'Helios', got '%s'", rec.Header().Get(testServerHeader))
 	}
 
 	// Verify compression was applied
-	if rec.Header().Get("Content-Encoding") != "gzip" {
-		t.Errorf("Expected Content-Encoding to be 'gzip', got '%s'", rec.Header().Get("Content-Encoding"))
+	if rec.Header().Get(testContentEncoding) != "gzip" {
+		t.Errorf("Expected Content-Encoding to be 'gzip', got '%s'", rec.Header().Get(testContentEncoding))
 	}
 
 	// Decompress and verify content
@@ -120,7 +140,7 @@ func TestPluginChainWithSizeLimit(t *testing.T) {
 
 	handler, err := BuildChain(pluginConfig, baseHandler)
 	if err != nil {
-		t.Fatalf("Failed to build plugin chain: %v", err)
+		t.Fatalf(testFailedBuildPlugin, err)
 	}
 
 	// Test with body under limit
@@ -132,7 +152,7 @@ func TestPluginChainWithSizeLimit(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 
 		if rec.Code != http.StatusOK {
-			t.Errorf("Expected status 200, got %d", rec.Code)
+			t.Errorf(testExpectedStatus200, rec.Code)
 		}
 	})
 
@@ -161,7 +181,7 @@ func TestPluginChainWithAuthentication(t *testing.T) {
 		Enabled: true,
 		Chain: []config.PluginConfig{
 			{
-				Name: "custom-auth",
+				Name: testCustomAuth,
 				Config: map[string]interface{}{
 					"apiKey": "secret-token-123",
 				},
@@ -171,26 +191,26 @@ func TestPluginChainWithAuthentication(t *testing.T) {
 
 	handler, err := BuildChain(pluginConfig, baseHandler)
 	if err != nil {
-		t.Fatalf("Failed to build plugin chain: %v", err)
+		t.Fatalf(testFailedBuildPlugin, err)
 	}
 
 	// Test with valid token
 	t.Run("valid token", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
-		req.Header.Set("X-API-Key", "secret-token-123")
+		req.Header.Set(testAPIKey, "secret-token-123")
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
 
 		if rec.Code != http.StatusOK {
-			t.Errorf("Expected status 200, got %d", rec.Code)
+			t.Errorf(testExpectedStatus200, rec.Code)
 		}
 	})
 
 	// Test with invalid token
 	t.Run("invalid token", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
-		req.Header.Set("X-API-Key", "wrong-token")
+		req.Header.Set(testAPIKey, "wrong-token")
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
@@ -216,7 +236,7 @@ func TestPluginChainWithAuthentication(t *testing.T) {
 // TestPluginChainOrder tests that plugin order matters
 func TestPluginChainOrder(t *testing.T) {
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set(testContentType, testTextPlain)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("test"))
 	})
@@ -229,7 +249,7 @@ func TestPluginChainOrder(t *testing.T) {
 				Name: "headers",
 				Config: map[string]interface{}{
 					"set": map[string]interface{}{
-						"X-Order": "headers-first",
+						testOrderHeader: "headers-first",
 					},
 				},
 			},
@@ -238,7 +258,7 @@ func TestPluginChainOrder(t *testing.T) {
 				Config: map[string]interface{}{
 					"level":         float64(5),
 					"min_size":      float64(0),
-					"content_types": []interface{}{"text/plain"},
+					"content_types": []interface{}{testTextPlain},
 				},
 			},
 		},
@@ -250,16 +270,16 @@ func TestPluginChainOrder(t *testing.T) {
 	}
 
 	req1 := httptest.NewRequest("GET", "/test", nil)
-	req1.Header.Set("Accept-Encoding", "gzip")
+	req1.Header.Set(testAcceptEncoding, "gzip")
 	rec1 := httptest.NewRecorder()
 	handler1.ServeHTTP(rec1, req1)
 
 	// Verify both plugins were applied
-	if rec1.Header().Get("X-Order") != "headers-first" {
-		t.Errorf("Expected X-Order header, got '%s'", rec1.Header().Get("X-Order"))
+	if rec1.Header().Get(testOrderHeader) != "headers-first" {
+		t.Errorf("Expected X-Order header, got '%s'", rec1.Header().Get(testOrderHeader))
 	}
-	if rec1.Header().Get("Content-Encoding") != "gzip" {
-		t.Errorf("Expected gzip encoding, got '%s'", rec1.Header().Get("Content-Encoding"))
+	if rec1.Header().Get(testContentEncoding) != "gzip" {
+		t.Errorf("Expected gzip encoding, got '%s'", rec1.Header().Get(testContentEncoding))
 	}
 }
 
@@ -277,7 +297,7 @@ func TestPluginChainDisabled(t *testing.T) {
 				Name: "headers",
 				Config: map[string]interface{}{
 					"set": map[string]interface{}{
-						"X-Should-Not-Exist": "true",
+						testShouldNotExistHeader: "true",
 					},
 				},
 			},
@@ -286,7 +306,7 @@ func TestPluginChainDisabled(t *testing.T) {
 
 	handler, err := BuildChain(pluginConfig, baseHandler)
 	if err != nil {
-		t.Fatalf("Failed to build plugin chain: %v", err)
+		t.Fatalf(testFailedBuildPlugin, err)
 	}
 
 	req := httptest.NewRequest("GET", "/test", nil)
@@ -294,8 +314,8 @@ func TestPluginChainDisabled(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	// Verify header was not added
-	if rec.Header().Get("X-Should-Not-Exist") != "" {
-		t.Errorf("Expected no X-Should-Not-Exist header, but got '%s'", rec.Header().Get("X-Should-Not-Exist"))
+	if rec.Header().Get(testShouldNotExistHeader) != "" {
+		t.Errorf("Expected no X-Should-Not-Exist header, but got '%s'", rec.Header().Get(testShouldNotExistHeader))
 	}
 }
 
@@ -346,7 +366,7 @@ func TestPluginListAvailability(t *testing.T) {
 
 	expectedPlugins := []string{
 		"gzip",
-		"custom-auth",
+		testCustomAuth,
 		"request-id",
 		"headers",
 		"logging",
@@ -375,7 +395,7 @@ func TestComplexPluginChain(t *testing.T) {
 		// Read request body
 		body, _ := io.ReadAll(r.Body)
 
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(testContentType, testApplicationJSON)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"message":"processed","received":"` + string(body) + `"}`))
 	}) // Complex chain: authentication -> size limit -> headers -> gzip -> logging
@@ -383,7 +403,7 @@ func TestComplexPluginChain(t *testing.T) {
 		Enabled: true,
 		Chain: []config.PluginConfig{
 			{
-				Name: "custom-auth",
+				Name: testCustomAuth,
 				Config: map[string]interface{}{
 					"apiKey": "valid-token",
 				},
@@ -398,8 +418,8 @@ func TestComplexPluginChain(t *testing.T) {
 				Name: "headers",
 				Config: map[string]interface{}{
 					"set": map[string]interface{}{
-						"X-API-Version": "v1",
-						"X-Powered-By":  "Helios",
+						testAPIVersionHeader: "v1",
+						testPoweredByHeader:  "Helios",
 					},
 				},
 			},
@@ -408,7 +428,7 @@ func TestComplexPluginChain(t *testing.T) {
 				Config: map[string]interface{}{
 					"level":         float64(6),
 					"min_size":      float64(0),
-					"content_types": []interface{}{"application/json"},
+					"content_types": []interface{}{testApplicationJSON},
 				},
 			},
 			{
@@ -426,29 +446,29 @@ func TestComplexPluginChain(t *testing.T) {
 	// Create request with valid auth and body
 	reqBody := bytes.NewBufferString(`{"data":"test"}`)
 	req := httptest.NewRequest("POST", "/api/test", reqBody)
-	req.Header.Set("X-API-Key", "valid-token")
-	req.Header.Set("Accept-Encoding", "gzip")
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(testAPIKey, "valid-token")
+	req.Header.Set(testAcceptEncoding, "gzip")
+	req.Header.Set(testContentType, testApplicationJSON)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
 
 	// Verify successful processing
 	if rec.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", rec.Code)
+		t.Errorf(testExpectedStatus200, rec.Code)
 	}
 
 	// Verify headers plugin worked
-	if rec.Header().Get("X-API-Version") != "v1" {
-		t.Errorf("Expected X-API-Version header, got '%s'", rec.Header().Get("X-API-Version"))
+	if rec.Header().Get(testAPIVersionHeader) != "v1" {
+		t.Errorf("Expected X-API-Version header, got '%s'", rec.Header().Get(testAPIVersionHeader))
 	}
-	if rec.Header().Get("X-Powered-By") != "Helios" {
-		t.Errorf("Expected X-Powered-By header, got '%s'", rec.Header().Get("X-Powered-By"))
+	if rec.Header().Get(testPoweredByHeader) != "Helios" {
+		t.Errorf("Expected X-Powered-By header, got '%s'", rec.Header().Get(testPoweredByHeader))
 	}
 
 	// Verify compression worked
-	if rec.Header().Get("Content-Encoding") != "gzip" {
-		t.Errorf("Expected gzip encoding, got '%s'", rec.Header().Get("Content-Encoding"))
+	if rec.Header().Get(testContentEncoding) != "gzip" {
+		t.Errorf("Expected gzip encoding, got '%s'", rec.Header().Get(testContentEncoding))
 	}
 
 	// Decompress and verify response
