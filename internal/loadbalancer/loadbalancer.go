@@ -542,6 +542,25 @@ func (lb *LoadBalancer) GetMetricsCollector() *metrics.MetricsCollector {
 	return lb.metricsCollector
 }
 
+// checkRateLimit checks if the request should be rate limited
+// Returns true if request should be allowed, false if rate limited
+func (lb *LoadBalancer) checkRateLimit(w http.ResponseWriter, r *http.Request) bool {
+	if lb.rateLimiter == nil {
+		return true
+	}
+
+	clientIP := utils.GetClientIP(r)
+	if !lb.rateLimiter.Allow(clientIP) {
+		lb.metricsCollector.RecordRateLimitedRequest()
+		logger := logging.WithContext(r.Context())
+		logger.Warn().Str("client_ip", clientIP).Msg("request rate limited")
+		http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+		return false
+	}
+
+	return true
+}
+
 // ServeHTTP implements the http.Handler interface
 func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
@@ -550,15 +569,9 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Record the request
 	lb.metricsCollector.RecordRequest()
 
-	// Check rate limiting if enabled
-	if lb.rateLimiter != nil {
-		clientIP := utils.GetClientIP(r)
-		if !lb.rateLimiter.Allow(clientIP) {
-			lb.metricsCollector.RecordRateLimitedRequest()
-			logger.Warn().Str("client_ip", clientIP).Msg("request rate limited")
-			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
-			return
-		}
+	// Check rate limiting
+	if !lb.checkRateLimit(w, r) {
+		return
 	}
 
 	// Execute request with circuit breaker protection if enabled
