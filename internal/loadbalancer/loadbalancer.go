@@ -501,11 +501,18 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return lb.handleRequest(w, r, startTime)
 		})
 		if err != nil {
-			logger.Error().Err(err).Msg("circuit breaker execution failed")
+			failureCount, successCount, requestCount := lb.circuitBreaker.Counts()
+			logger.Error().
+				Err(err).
+				Uint32("failure_count", failureCount).
+				Uint32("success_count", successCount).
+				Uint32("total_requests", requestCount).
+				Msg("circuit breaker execution failed")
+
 			if err == circuitbreaker.ErrCircuitBreakerOpen {
-				http.Error(w, "Service temporarily unavailable", http.StatusServiceUnavailable)
+				http.Error(w, fmt.Sprintf("Service temporarily unavailable - circuit breaker is open (failures: %d, requests: %d)", failureCount, requestCount), http.StatusServiceUnavailable)
 			} else if err == circuitbreaker.ErrTooManyRequests {
-				http.Error(w, "Too many requests", http.StatusTooManyRequests)
+				http.Error(w, fmt.Sprintf("Too many requests - circuit breaker half-open (successes: %d)", successCount), http.StatusTooManyRequests)
 			} else {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
