@@ -401,17 +401,18 @@ func (lb *LoadBalancer) MarkBackendUnhealthy(backend *Backend, duration time.Dur
 // IsBackendHealthy checks if a backend is currently healthy
 func (lb *LoadBalancer) IsBackendHealthy(backend *Backend) bool {
 	backend.Mutex.RLock()
-	defer backend.Mutex.RUnlock()
+	isHealthy := backend.IsHealthy
+	unhealthyUntil := backend.UnhealthyUntil
+	backend.Mutex.RUnlock()
 
 	// If it's marked as unhealthy, check if the unhealthy period has expired
-	if !backend.IsHealthy {
-		if time.Now().After(backend.UnhealthyUntil) {
-			// The unhealthy period has expired, mark it as healthy again
-			backend.Mutex.RUnlock()
-			backend.Mutex.Lock()
+	if !isHealthy && time.Now().After(unhealthyUntil) {
+		// The unhealthy period has expired, mark it as healthy again
+		backend.Mutex.Lock()
+		// Double-check after acquiring write lock to prevent race condition
+		if !backend.IsHealthy && time.Now().After(backend.UnhealthyUntil) {
 			backend.IsHealthy = true
 			backend.Mutex.Unlock()
-			backend.Mutex.RLock()
 
 			// Update metrics to reflect healthy status
 			if lb.metricsCollector != nil {
@@ -421,10 +422,11 @@ func (lb *LoadBalancer) IsBackendHealthy(backend *Backend) bool {
 			logging.L().Info().Str("backend", backend.Name).Msg("backend marked healthy")
 			return true
 		}
+		backend.Mutex.Unlock()
 		return false
 	}
 
-	return true
+	return isHealthy
 }
 
 // IncrementConnections increments the active connection count for a backend
