@@ -186,7 +186,7 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 		if idleTimeout <= 0 {
 			idleTimeout = 5 * time.Minute
 		}
-		
+
 		lb.wsPool = NewWebSocketPool(maxIdle, maxActive, idleTimeout)
 		logging.L().Info().
 			Int("max_idle", maxIdle).
@@ -382,8 +382,49 @@ func (lb *LoadBalancer) AddBackend(backendCfg config.BackendConfig) error {
 		return err
 	}
 
-	// Create a reverse proxy for this backend
+	// Create a reverse proxy for this backend with optimized transport
 	proxy := httputil.NewSingleHostReverseProxy(backendURL)
+	
+	// Configure custom transport with timeouts (LEETCODE-STYLE OPTIMIZATION!)
+	dialTimeout := time.Duration(lb.config.Server.Timeouts.BackendDial) * time.Second
+	if dialTimeout == 0 {
+		dialTimeout = 10 * time.Second // Default: 10s dial timeout
+	}
+	
+	readTimeout := time.Duration(lb.config.Server.Timeouts.BackendRead) * time.Second
+	if readTimeout == 0 {
+		readTimeout = 30 * time.Second // Default: 30s backend read timeout
+	}
+	
+	idleConnTimeout := time.Duration(lb.config.Server.Timeouts.BackendIdle) * time.Second
+	if idleConnTimeout == 0 {
+		idleConnTimeout = 90 * time.Second // Default: 90s idle connection timeout
+	}
+
+	// Custom transport with connection pooling and timeout optimization
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   dialTimeout,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		
+		// Connection pooling (prevent connection exhaustion)
+		MaxIdleConns:          100,              // Total idle connections
+		MaxIdleConnsPerHost:   10,               // Per-host idle connections
+		MaxConnsPerHost:       100,              // Limit concurrent connections per host
+		IdleConnTimeout:       idleConnTimeout,
+		
+		// Timeouts
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: readTimeout,
+		ExpectContinueTimeout: 1 * time.Second,
+		
+		// Performance optimizations
+		ForceAttemptHTTP2:     true,  // Use HTTP/2 when available
+		DisableCompression:    false, // Let backend handle compression
+	}
+	
+	proxy.Transport = transport
 
 	// Create the backend
 	// If weight is not specified or is invalid, default to 1
@@ -684,12 +725,12 @@ func (lb *LoadBalancer) Stop() {
 	logging.L().Info().Msg("shutting down load balancer")
 	lb.cancel()
 	lb.healthCheckWg.Wait()
-	
+
 	// Shutdown WebSocket pool if enabled
 	if lb.wsPool != nil {
 		lb.wsPool.Shutdown()
 		logging.L().Info().Msg("WebSocket connection pool shutdown complete")
 	}
-	
+
 	logging.L().Info().Msg("load balancer shutdown complete")
 }

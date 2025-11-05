@@ -4,6 +4,15 @@ server:
     enabled: false # Enable TLS/SSL termination
     certFile: "certs/cert.pem" # Path to TLS certificate file
     keyFile: "certs/key.pem" # Path to TLS private key file
+  timeouts:
+    read: 15 # ReadTimeout in seconds (protects against slow-read attacks)
+    write: 15 # WriteTimeout in seconds (prevents slow writes)
+    idle: 60 # IdleTimeout in seconds (keep-alive timeout)
+    handler: 30 # Handler timeout in seconds (end-to-end request timeout)
+    shutdown: 30 # Graceful shutdown timeout in seconds
+    backend_dial: 10 # Backend connection dial timeout in seconds
+    backend_read: 30 # Backend response read timeout in seconds
+    backend_idle: 90 # Backend idle connection timeout in seconds
 
 backends:
   - name: "server1"

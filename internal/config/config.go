@@ -23,8 +23,21 @@ type Config struct {
 
 // ServerConfig holds the server configuration
 type ServerConfig struct {
-	Port int       `yaml:"port"`
-	TLS  TLSConfig `yaml:"tls,omitempty"`
+	Port     int            `yaml:"port"`
+	TLS      TLSConfig      `yaml:"tls,omitempty"`
+	Timeouts TimeoutConfig `yaml:"timeouts,omitempty"`
+}
+
+// TimeoutConfig holds HTTP server timeout settings
+type TimeoutConfig struct {
+	Read          int `yaml:"read"`           // ReadTimeout in seconds
+	Write         int `yaml:"write"`          // WriteTimeout in seconds
+	Idle          int `yaml:"idle"`           // IdleTimeout in seconds
+	Handler       int `yaml:"handler"`        // Handler timeout in seconds (end-to-end request)
+	Shutdown      int `yaml:"shutdown"`       // Graceful shutdown timeout in seconds
+	BackendDial   int `yaml:"backend_dial"`   // Backend connection dial timeout in seconds
+	BackendRead   int `yaml:"backend_read"`   // Backend response read timeout in seconds
+	BackendIdle   int `yaml:"backend_idle"`   // Backend idle connection timeout in seconds
 }
 
 // TLSConfig holds the TLS configuration settings
@@ -43,7 +56,7 @@ type BackendConfig struct {
 
 // LoadBalancerConfig holds the load balancer configuration
 type LoadBalancerConfig struct {
-	Strategy      string               `yaml:"strategy"`
+	Strategy      string              `yaml:"strategy"`
 	WebSocketPool WebSocketPoolConfig `yaml:"websocket_pool"`
 }
 
@@ -192,6 +205,32 @@ func (c *Config) Validate() error {
 		if c.Server.TLS.KeyFile == "" {
 			return fmt.Errorf("TLS enabled but key file not specified")
 		}
+	}
+
+	// Validate timeout configuration (all values in seconds, must be non-negative)
+	if c.Server.Timeouts.Read < 0 {
+		return fmt.Errorf("server read timeout must be non-negative (got %d)", c.Server.Timeouts.Read)
+	}
+	if c.Server.Timeouts.Write < 0 {
+		return fmt.Errorf("server write timeout must be non-negative (got %d)", c.Server.Timeouts.Write)
+	}
+	if c.Server.Timeouts.Idle < 0 {
+		return fmt.Errorf("server idle timeout must be non-negative (got %d)", c.Server.Timeouts.Idle)
+	}
+	if c.Server.Timeouts.Handler < 0 {
+		return fmt.Errorf("server handler timeout must be non-negative (got %d)", c.Server.Timeouts.Handler)
+	}
+	if c.Server.Timeouts.Shutdown < 0 {
+		return fmt.Errorf("server shutdown timeout must be non-negative (got %d)", c.Server.Timeouts.Shutdown)
+	}
+	if c.Server.Timeouts.BackendDial < 0 {
+		return fmt.Errorf("backend dial timeout must be non-negative (got %d)", c.Server.Timeouts.BackendDial)
+	}
+	if c.Server.Timeouts.BackendRead < 0 {
+		return fmt.Errorf("backend read timeout must be non-negative (got %d)", c.Server.Timeouts.BackendRead)
+	}
+	if c.Server.Timeouts.BackendIdle < 0 {
+		return fmt.Errorf("backend idle timeout must be non-negative (got %d)", c.Server.Timeouts.BackendIdle)
 	}
 
 	// Validate load balancer strategy

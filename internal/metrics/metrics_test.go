@@ -51,10 +51,10 @@ func TestExponentialMovingAverage(t *testing.T) {
 	// Test EMA behavior with multiple requests
 	mc.RecordRequest()
 	mc.RecordResponse(true, 100*time.Millisecond)
-	
+
 	mc.RecordRequest()
 	mc.RecordResponse(true, 200*time.Millisecond)
-	
+
 	mc.RecordRequest()
 	mc.RecordResponse(true, 300*time.Millisecond)
 
@@ -124,7 +124,7 @@ func TestMaxBackendsLimit(t *testing.T) {
 
 	// Should not exceed max limit
 	if len(metrics.BackendMetrics) > MaxBackendMetrics {
-		t.Errorf("Backend metrics exceeded limit: got %d, max %d", 
+		t.Errorf("Backend metrics exceeded limit: got %d, max %d",
 			len(metrics.BackendMetrics), MaxBackendMetrics)
 	}
 }

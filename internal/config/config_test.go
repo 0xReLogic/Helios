@@ -381,6 +381,185 @@ func TestValidateWebSocketPool(t *testing.T) {
 	}
 }
 
+func TestValidateTimeoutConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  TimeoutConfig
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "all valid timeouts",
+			config: TimeoutConfig{
+				Read:         15,
+				Write:        15,
+				Idle:         60,
+				Handler:      30,
+				Shutdown:     30,
+				BackendDial:  10,
+				BackendRead:  30,
+				BackendIdle:  90,
+			},
+			wantErr: false,
+		},
+		{
+			name: "zero timeouts allowed",
+			config: TimeoutConfig{
+				Read:         0,
+				Write:        0,
+				Idle:         0,
+				Handler:      0,
+				Shutdown:     0,
+				BackendDial:  0,
+				BackendRead:  0,
+				BackendIdle:  0,
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative read timeout",
+			config: TimeoutConfig{
+				Read:         -1,
+				Write:        15,
+				Idle:         60,
+				Handler:      30,
+				Shutdown:     30,
+				BackendDial:  10,
+				BackendRead:  30,
+				BackendIdle:  90,
+			},
+			wantErr: true,
+			errMsg:  "read timeout must be non-negative",
+		},
+		{
+			name: "negative write timeout",
+			config: TimeoutConfig{
+				Read:         15,
+				Write:        -1,
+				Idle:         60,
+				Handler:      30,
+				Shutdown:     30,
+				BackendDial:  10,
+				BackendRead:  30,
+				BackendIdle:  90,
+			},
+			wantErr: true,
+			errMsg:  "write timeout must be non-negative",
+		},
+		{
+			name: "negative idle timeout",
+			config: TimeoutConfig{
+				Read:         15,
+				Write:        15,
+				Idle:         -1,
+				Handler:      30,
+				Shutdown:     30,
+				BackendDial:  10,
+				BackendRead:  30,
+				BackendIdle:  90,
+			},
+			wantErr: true,
+			errMsg:  "idle timeout must be non-negative",
+		},
+		{
+			name: "negative handler timeout",
+			config: TimeoutConfig{
+				Read:         15,
+				Write:        15,
+				Idle:         60,
+				Handler:      -1,
+				Shutdown:     30,
+				BackendDial:  10,
+				BackendRead:  30,
+				BackendIdle:  90,
+			},
+			wantErr: true,
+			errMsg:  "handler timeout must be non-negative",
+		},
+		{
+			name: "negative shutdown timeout",
+			config: TimeoutConfig{
+				Read:         15,
+				Write:        15,
+				Idle:         60,
+				Handler:      30,
+				Shutdown:     -1,
+				BackendDial:  10,
+				BackendRead:  30,
+				BackendIdle:  90,
+			},
+			wantErr: true,
+			errMsg:  "shutdown timeout must be non-negative",
+		},
+		{
+			name: "negative backend dial timeout",
+			config: TimeoutConfig{
+				Read:         15,
+				Write:        15,
+				Idle:         60,
+				Handler:      30,
+				Shutdown:     30,
+				BackendDial:  -1,
+				BackendRead:  30,
+				BackendIdle:  90,
+			},
+			wantErr: true,
+			errMsg:  "backend dial timeout must be non-negative",
+		},
+		{
+			name: "negative backend read timeout",
+			config: TimeoutConfig{
+				Read:         15,
+				Write:        15,
+				Idle:         60,
+				Handler:      30,
+				Shutdown:     30,
+				BackendDial:  10,
+				BackendRead:  -1,
+				BackendIdle:  90,
+			},
+			wantErr: true,
+			errMsg:  "backend read timeout must be non-negative",
+		},
+		{
+			name: "negative backend idle timeout",
+			config: TimeoutConfig{
+				Read:         15,
+				Write:        15,
+				Idle:         60,
+				Handler:      30,
+				Shutdown:     30,
+				BackendDial:  10,
+				BackendRead:  30,
+				BackendIdle:  -1,
+			},
+			wantErr: true,
+			errMsg:  "backend idle timeout must be non-negative",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				Server: ServerConfig{
+					Port:     8080,
+					Timeouts: tt.config,
+				},
+				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+			}
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && tt.errMsg != "" {
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("Validate() error = %v, expected to contain %q", err, tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
 func TestValidateActiveHealthChecks(t *testing.T) {
 	tests := []struct {
 		name    string

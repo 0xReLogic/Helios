@@ -176,7 +176,7 @@ func TestWebSocketPool_Cleanup(t *testing.T) {
 	defer pool.Shutdown()
 
 	backend := "backend1"
-	
+
 	// Add some connections
 	conns := make([]*mockConn, 3)
 	for i := 0; i < 3; i++ {
@@ -250,7 +250,7 @@ func TestWebSocketPool_Shutdown(t *testing.T) {
 
 	backend := "backend1"
 	conns := make([]*mockConn, 3)
-	
+
 	for i := 0; i < 3; i++ {
 		conns[i] = &mockConn{}
 		pool.Put(backend, conns[i])

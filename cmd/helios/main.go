@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/0xReLogic/Helios/internal/adminapi"
 	"github.com/0xReLogic/Helios/internal/config"
@@ -118,10 +122,80 @@ func main() {
 
 	handler = logging.RequestContextMiddleware(cfg.Logging)(handler)
 
-	server := &http.Server{
-		Addr:    addr,
-		Handler: handler,
+	// Apply timeout configurations with smart defaults
+	readTimeout := time.Duration(cfg.Server.Timeouts.Read) * time.Second
+	if readTimeout == 0 {
+		readTimeout = 15 * time.Second // Default: protect against slow-read attacks
 	}
+	writeTimeout := time.Duration(cfg.Server.Timeouts.Write) * time.Second
+	if writeTimeout == 0 {
+		writeTimeout = 15 * time.Second // Default: prevent slow writes
+	}
+	idleTimeout := time.Duration(cfg.Server.Timeouts.Idle) * time.Second
+	if idleTimeout == 0 {
+		idleTimeout = 60 * time.Second // Default: keep-alive timeout
+	}
+
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
+	}
+
+	// Setup graceful shutdown
+	shutdownTimeout := time.Duration(cfg.Server.Timeouts.Shutdown) * time.Second
+	if shutdownTimeout == 0 {
+		shutdownTimeout = 30 * time.Second // Default: 30s graceful shutdown
+	}
+
+	// Channel for shutdown signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Start server in goroutine
+	serverErrors := make(chan error, 1)
+	go func() {
+		// Start the server with or without TLS based on configuration
+		if cfg.Server.TLS.Enabled {
+			logger.Info().Msg("tls enabled")
+
+			// Validate that cert and key files are specified
+			if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
+				serverErrors <- fmt.Errorf("tls enabled but certificate or key not configured")
+				return
+			}
+
+			// Check if the certificate and key files exist
+			if _, err := os.Stat(cfg.Server.TLS.CertFile); os.IsNotExist(err) {
+				serverErrors <- fmt.Errorf("tls certificate file not found: %s", cfg.Server.TLS.CertFile)
+				return
+			}
+			if _, err := os.Stat(cfg.Server.TLS.KeyFile); os.IsNotExist(err) {
+				serverErrors <- fmt.Errorf("tls key file not found: %s", cfg.Server.TLS.KeyFile)
+				return
+			}
+
+			logger.Info().Int("port", cfg.Server.Port).Msg("listening for https")
+			logger.Info().
+				Dur("read_timeout", readTimeout).
+				Dur("write_timeout", writeTimeout).
+				Dur("idle_timeout", idleTimeout).
+				Msg("server timeouts configured")
+			
+			serverErrors <- server.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile)
+		} else {
+			logger.Info().Int("port", cfg.Server.Port).Msg("listening for http")
+			logger.Info().
+				Dur("read_timeout", readTimeout).
+				Dur("write_timeout", writeTimeout).
+				Dur("idle_timeout", idleTimeout).
+				Msg("server timeouts configured")
+			
+			serverErrors <- server.ListenAndServe()
+		}
+	}()
 
 	// Start server
 	logger.Info().Int("port", cfg.Server.Port).Msg("helios load balancer starting")
@@ -150,31 +224,28 @@ func main() {
 		logger.Info().Msg("passive health checks disabled")
 	}
 
-	// Start the server with or without TLS based on configuration
-	if cfg.Server.TLS.Enabled {
-		logger.Info().Msg("tls enabled")
+	// Wait for shutdown signal or server error
+	select {
+	case err := <-serverErrors:
+		logger.Fatal().Err(err).Msg("server failed to start")
+	case sig := <-sigChan:
+		logger.Info().Str("signal", sig.String()).Msg("shutdown signal received")
 
-		// Validate that cert and key files are specified
-		if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
-			logger.Fatal().Msg("tls enabled but certificate or key not configured")
+		// Graceful shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		logger.Info().Dur("timeout", shutdownTimeout).Msg("shutting down server gracefully")
+
+		// Shutdown HTTP server
+		if err := server.Shutdown(ctx); err != nil {
+			logger.Error().Err(err).Msg("error during server shutdown")
+			server.Close()
 		}
 
-		// Check if the certificate and key files exist
-		if _, err := os.Stat(cfg.Server.TLS.CertFile); os.IsNotExist(err) {
-			logger.Fatal().Str("cert_file", cfg.Server.TLS.CertFile).Msg("tls certificate file not found")
-		}
-		if _, err := os.Stat(cfg.Server.TLS.KeyFile); os.IsNotExist(err) {
-			logger.Fatal().Str("key_file", cfg.Server.TLS.KeyFile).Msg("tls key file not found")
-		}
+		// Stop load balancer
+		lb.Stop()
 
-		logger.Info().Int("port", cfg.Server.Port).Msg("listening for https")
-		if err := server.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile); err != nil {
-			logger.Fatal().Err(err).Msg("failed to start tls server")
-		}
-	} else {
-		logger.Info().Int("port", cfg.Server.Port).Msg("listening for http")
-		if err := server.ListenAndServe(); err != nil {
-			logger.Fatal().Err(err).Msg("failed to start http server")
-		}
+		logger.Info().Msg("server shutdown complete")
 	}
 }

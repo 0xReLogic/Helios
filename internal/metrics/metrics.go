@@ -72,10 +72,10 @@ type CircuitBreakerMetrics struct {
 
 // MetricsCollector manages metrics collection
 type MetricsCollector struct {
-	metrics      *Metrics
-	metricsPool  sync.Pool // Pool for Metrics copies to reduce GC pressure
-	backendPool  sync.Pool // Pool for BackendMetrics copies
-	avgMutex     sync.Mutex // Separate mutex for average calculation to reduce contention
+	metrics     *Metrics
+	metricsPool sync.Pool  // Pool for Metrics copies to reduce GC pressure
+	backendPool sync.Pool  // Pool for BackendMetrics copies
+	avgMutex    sync.Mutex // Separate mutex for average calculation to reduce contention
 }
 
 // NewMetricsCollector creates a new metrics collector
@@ -88,7 +88,7 @@ func NewMetricsCollector() *MetricsCollector {
 			alpha:                 DefaultAlpha,
 		},
 	}
-	
+
 	// Initialize object pools for zero-allocation copies
 	mc.metricsPool.New = func() interface{} {
 		return &Metrics{
@@ -96,11 +96,11 @@ func NewMetricsCollector() *MetricsCollector {
 			CircuitBreakerMetrics: make(map[string]*CircuitBreakerMetrics),
 		}
 	}
-	
+
 	mc.backendPool.New = func() interface{} {
 		return &BackendMetrics{}
 	}
-	
+
 	return mc
 }
 
@@ -127,7 +127,7 @@ func (mc *MetricsCollector) RecordResponse(success bool, responseTime time.Durat
 // RecordBackendRequest records a request to a specific backend
 func (mc *MetricsCollector) RecordBackendRequest(backendName string, success bool, responseTime time.Duration) {
 	mc.metrics.mutex.Lock()
-	
+
 	// Check if we're exceeding max backends limit
 	if len(mc.metrics.BackendMetrics) >= MaxBackendMetrics {
 		mc.metrics.mutex.Unlock()
@@ -156,7 +156,7 @@ func (mc *MetricsCollector) RecordBackendRequest(backendName string, success boo
 	isFirst := backend.AverageResponseTime == 0
 	backend.AverageResponseTime = float64(boolToInt(isFirst))*responseTimeMs +
 		float64(1-boolToInt(isFirst))*(backend.alpha*responseTimeMs+(1-backend.alpha)*backend.AverageResponseTime)
-	
+
 	mc.metrics.mutex.Unlock()
 }
 
@@ -209,7 +209,7 @@ func (mc *MetricsCollector) RecordRateLimitedRequest() {
 // UpdateCircuitBreakerState updates the state of a circuit breaker
 func (mc *MetricsCollector) UpdateCircuitBreakerState(name, state string, failureCount, successCount, requestCount uint32) {
 	mc.metrics.mutex.Lock()
-	
+
 	// Prevent unbounded growth of circuit breaker metrics
 	if len(mc.metrics.CircuitBreakerMetrics) >= MaxCircuitBreakerMetrics {
 		mc.metrics.mutex.Unlock()
@@ -229,7 +229,7 @@ func (mc *MetricsCollector) UpdateCircuitBreakerState(name, state string, failur
 	cbMetrics.SuccessCount = successCount
 	cbMetrics.RequestCount = requestCount
 	cbMetrics.LastStateChange = time.Now()
-	
+
 	mc.metrics.mutex.Unlock()
 }
 
@@ -239,7 +239,7 @@ func (mc *MetricsCollector) updateAverageResponseTime(newResponseTime float64) {
 	for {
 		oldBits := atomic.LoadUint64(&mc.metrics.avgResponseTimeBits)
 		oldAvg := math.Float64frombits(oldBits)
-		
+
 		// Calculate new EMA
 		var newAvg float64
 		if oldAvg == 0 {
@@ -247,9 +247,9 @@ func (mc *MetricsCollector) updateAverageResponseTime(newResponseTime float64) {
 		} else {
 			newAvg = mc.metrics.alpha*newResponseTime + (1-mc.metrics.alpha)*oldAvg
 		}
-		
+
 		newBits := math.Float64bits(newAvg)
-		
+
 		// Try to swap - retry if another goroutine updated it
 		if atomic.CompareAndSwapUint64(&mc.metrics.avgResponseTimeBits, oldBits, newBits) {
 			break
@@ -260,13 +260,13 @@ func (mc *MetricsCollector) updateAverageResponseTime(newResponseTime float64) {
 // GetMetrics returns a copy of current metrics
 func (mc *MetricsCollector) GetMetrics() *Metrics {
 	mc.metrics.mutex.RLock()
-	
+
 	// Update uptime (fast string operation)
 	mc.metrics.Uptime = time.Since(mc.metrics.StartTime).String()
 
 	// Get pooled metrics object to reduce allocations
 	metricsCopy := mc.metricsPool.Get().(*Metrics)
-	
+
 	// Reset maps (reuse existing capacity)
 	for k := range metricsCopy.BackendMetrics {
 		delete(metricsCopy.BackendMetrics, k)
@@ -274,17 +274,17 @@ func (mc *MetricsCollector) GetMetrics() *Metrics {
 	for k := range metricsCopy.CircuitBreakerMetrics {
 		delete(metricsCopy.CircuitBreakerMetrics, k)
 	}
-	
+
 	// Copy atomic counters (lock-free reads)
 	metricsCopy.TotalRequests = atomic.LoadUint64(&mc.metrics.TotalRequests)
 	metricsCopy.SuccessfulRequests = atomic.LoadUint64(&mc.metrics.SuccessfulRequests)
 	metricsCopy.FailedRequests = atomic.LoadUint64(&mc.metrics.FailedRequests)
 	metricsCopy.RateLimitedRequests = atomic.LoadUint64(&mc.metrics.RateLimitedRequests)
-	
+
 	// Copy average response time atomically
 	avgBits := atomic.LoadUint64(&mc.metrics.avgResponseTimeBits)
 	metricsCopy.AverageResponseTime = math.Float64frombits(avgBits)
-	
+
 	// Copy non-atomic fields
 	metricsCopy.StartTime = mc.metrics.StartTime
 	metricsCopy.Uptime = mc.metrics.Uptime
@@ -314,7 +314,7 @@ func (mc *MetricsCollector) GetMetrics() *Metrics {
 			LastStateChange: cb.LastStateChange,
 		}
 	}
-	
+
 	mc.metrics.mutex.RUnlock()
 
 	return metricsCopy
