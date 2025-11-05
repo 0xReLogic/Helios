@@ -144,9 +144,146 @@ func LoadConfig(filePath string) (*Config, error) {
 	}
 
 	// Validate configuration
-	if len(config.Backends) == 0 {
-		return nil, fmt.Errorf("no backend servers configured")
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return &config, nil
+}
+
+// Validate performs comprehensive validation of the configuration
+func (c *Config) Validate() error {
+	// Validate backends
+	if len(c.Backends) == 0 {
+		return fmt.Errorf("no backend servers configured")
+	}
+
+	for i, backend := range c.Backends {
+		if backend.Name == "" {
+			return fmt.Errorf("backend %d: name is required", i)
+		}
+		if backend.Address == "" {
+			return fmt.Errorf("backend %s: address is required", backend.Name)
+		}
+		if backend.Weight < 0 {
+			return fmt.Errorf("backend %s: weight must be non-negative (got %d)", backend.Name, backend.Weight)
+		}
+	}
+
+	// Validate server port
+	if c.Server.Port <= 0 || c.Server.Port > 65535 {
+		return fmt.Errorf("server port must be between 1 and 65535 (got %d)", c.Server.Port)
+	}
+
+	// Validate TLS configuration
+	if c.Server.TLS.Enabled {
+		if c.Server.TLS.CertFile == "" {
+			return fmt.Errorf("TLS enabled but cert file not specified")
+		}
+		if c.Server.TLS.KeyFile == "" {
+			return fmt.Errorf("TLS enabled but key file not specified")
+		}
+	}
+
+	// Validate load balancer strategy
+	validStrategies := map[string]bool{
+		"round_robin":          true,
+		"least_connections":    true,
+		"weighted_round_robin": true,
+		"ip_hash":              true,
+	}
+	if c.LoadBalancer.Strategy != "" && !validStrategies[c.LoadBalancer.Strategy] {
+		return fmt.Errorf("invalid load balancer strategy: %s (valid: round_robin, least_connections, weighted_round_robin, ip_hash)", c.LoadBalancer.Strategy)
+	}
+
+	// Validate active health checks
+	if c.HealthChecks.Active.Enabled {
+		if c.HealthChecks.Active.Interval <= 0 {
+			return fmt.Errorf("active health check interval must be positive (got %d)", c.HealthChecks.Active.Interval)
+		}
+		if c.HealthChecks.Active.Timeout <= 0 {
+			return fmt.Errorf("active health check timeout must be positive (got %d)", c.HealthChecks.Active.Timeout)
+		}
+		if c.HealthChecks.Active.Timeout >= c.HealthChecks.Active.Interval {
+			return fmt.Errorf("active health check timeout (%d) must be less than interval (%d)", c.HealthChecks.Active.Timeout, c.HealthChecks.Active.Interval)
+		}
+		if c.HealthChecks.Active.Path == "" {
+			return fmt.Errorf("active health check path is required when enabled")
+		}
+	}
+
+	// Validate passive health checks
+	if c.HealthChecks.Passive.Enabled {
+		if c.HealthChecks.Passive.UnhealthyThreshold <= 0 {
+			return fmt.Errorf("passive health check unhealthy threshold must be positive (got %d)", c.HealthChecks.Passive.UnhealthyThreshold)
+		}
+		if c.HealthChecks.Passive.UnhealthyTimeout <= 0 {
+			return fmt.Errorf("passive health check unhealthy timeout must be positive (got %d)", c.HealthChecks.Passive.UnhealthyTimeout)
+		}
+	}
+
+	// Validate rate limit
+	if c.RateLimit.Enabled {
+		if c.RateLimit.MaxTokens <= 0 {
+			return fmt.Errorf("rate limit max tokens must be positive (got %d)", c.RateLimit.MaxTokens)
+		}
+		if c.RateLimit.RefillRate <= 0 {
+			return fmt.Errorf("rate limit refill rate must be positive (got %d)", c.RateLimit.RefillRate)
+		}
+	}
+
+	// Validate circuit breaker
+	if c.CircuitBreaker.Enabled {
+		if c.CircuitBreaker.FailureThreshold <= 0 {
+			return fmt.Errorf("circuit breaker failure threshold must be positive (got %d)", c.CircuitBreaker.FailureThreshold)
+		}
+		if c.CircuitBreaker.SuccessThreshold <= 0 {
+			return fmt.Errorf("circuit breaker success threshold must be positive (got %d)", c.CircuitBreaker.SuccessThreshold)
+		}
+		if c.CircuitBreaker.TimeoutSeconds <= 0 {
+			return fmt.Errorf("circuit breaker timeout must be positive (got %d)", c.CircuitBreaker.TimeoutSeconds)
+		}
+		if c.CircuitBreaker.IntervalSeconds <= 0 {
+			return fmt.Errorf("circuit breaker interval must be positive (got %d)", c.CircuitBreaker.IntervalSeconds)
+		}
+	}
+
+	// Validate metrics
+	if c.Metrics.Enabled {
+		if c.Metrics.Port <= 0 || c.Metrics.Port > 65535 {
+			return fmt.Errorf("metrics port must be between 1 and 65535 (got %d)", c.Metrics.Port)
+		}
+		if c.Metrics.Path == "" {
+			return fmt.Errorf("metrics path is required when enabled")
+		}
+	}
+
+	// Validate admin API
+	if c.AdminAPI.Enabled {
+		if c.AdminAPI.Port <= 0 || c.AdminAPI.Port > 65535 {
+			return fmt.Errorf("admin API port must be between 1 and 65535 (got %d)", c.AdminAPI.Port)
+		}
+	}
+
+	// Validate logging
+	validLogLevels := map[string]bool{
+		"debug": true,
+		"info":  true,
+		"warn":  true,
+		"error": true,
+		"fatal": true,
+	}
+	if c.Logging.Level != "" && !validLogLevels[c.Logging.Level] {
+		return fmt.Errorf("invalid log level: %s (valid: debug, info, warn, error, fatal)", c.Logging.Level)
+	}
+
+	validLogFormats := map[string]bool{
+		"json":    true,
+		"console": true,
+	}
+	if c.Logging.Format != "" && !validLogFormats[c.Logging.Format] {
+		return fmt.Errorf("invalid log format: %s (valid: json, console)", c.Logging.Format)
+	}
+
+	return nil
 }
