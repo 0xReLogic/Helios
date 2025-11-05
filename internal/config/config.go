@@ -175,7 +175,40 @@ func LoadConfig(filePath string) (*Config, error) {
 
 // Validate performs comprehensive validation of the configuration
 func (c *Config) Validate() error {
-	// Validate backends
+	if err := c.validateBackends(); err != nil {
+		return err
+	}
+	if err := c.validateServer(); err != nil {
+		return err
+	}
+	if err := c.validateTimeouts(); err != nil {
+		return err
+	}
+	if err := c.validateLoadBalancer(); err != nil {
+		return err
+	}
+	if err := c.validateHealthChecks(); err != nil {
+		return err
+	}
+	if err := c.validateRateLimit(); err != nil {
+		return err
+	}
+	if err := c.validateCircuitBreaker(); err != nil {
+		return err
+	}
+	if err := c.validateMetrics(); err != nil {
+		return err
+	}
+	if err := c.validateAdminAPI(); err != nil {
+		return err
+	}
+	if err := c.validateLogging(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Config) validateBackends() error {
 	if len(c.Backends) == 0 {
 		return fmt.Errorf("no backend servers configured")
 	}
@@ -191,8 +224,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("backend %s: weight must be non-negative (got %d)", backend.Name, backend.Weight)
 		}
 	}
+	return nil
+}
 
-	// Validate server port
+func (c *Config) validateServer() error {
 	if c.Server.Port <= 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("server port must be between 1 and 65535 (got %d)", c.Server.Port)
 	}
@@ -206,8 +241,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("TLS enabled but key file not specified")
 		}
 	}
+	return nil
+}
 
-	// Validate timeout configuration (all values in seconds, must be non-negative)
+func (c *Config) validateTimeouts() error {
 	if c.Server.Timeouts.Read < 0 {
 		return fmt.Errorf("server read timeout must be non-negative (got %d)", c.Server.Timeouts.Read)
 	}
@@ -232,7 +269,10 @@ func (c *Config) Validate() error {
 	if c.Server.Timeouts.BackendIdle < 0 {
 		return fmt.Errorf("backend idle timeout must be non-negative (got %d)", c.Server.Timeouts.BackendIdle)
 	}
+	return nil
+}
 
+func (c *Config) validateLoadBalancer() error {
 	// Validate load balancer strategy
 	validStrategies := map[string]bool{
 		"round_robin":          true,
@@ -259,7 +299,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("websocket pool idle_timeout_seconds must be non-negative (got %d)", c.LoadBalancer.WebSocketPool.IdleTimeoutSeconds)
 		}
 	}
+	return nil
+}
 
+func (c *Config) validateHealthChecks() error {
 	// Validate active health checks
 	if c.HealthChecks.Active.Enabled {
 		if c.HealthChecks.Active.Interval <= 0 {
@@ -285,8 +328,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("passive health check unhealthy timeout must be positive (got %d)", c.HealthChecks.Passive.UnhealthyTimeout)
 		}
 	}
+	return nil
+}
 
-	// Validate rate limit
+func (c *Config) validateRateLimit() error {
 	if c.RateLimit.Enabled {
 		if c.RateLimit.MaxTokens <= 0 {
 			return fmt.Errorf("rate limit max tokens must be positive (got %d)", c.RateLimit.MaxTokens)
@@ -295,8 +340,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("rate limit refill rate must be positive (got %d)", c.RateLimit.RefillRate)
 		}
 	}
+	return nil
+}
 
-	// Validate circuit breaker
+func (c *Config) validateCircuitBreaker() error {
 	if c.CircuitBreaker.Enabled {
 		if c.CircuitBreaker.FailureThreshold <= 0 {
 			return fmt.Errorf("circuit breaker failure threshold must be positive (got %d)", c.CircuitBreaker.FailureThreshold)
@@ -311,8 +358,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("circuit breaker interval must be positive (got %d)", c.CircuitBreaker.IntervalSeconds)
 		}
 	}
+	return nil
+}
 
-	// Validate metrics
+func (c *Config) validateMetrics() error {
 	if c.Metrics.Enabled {
 		if c.Metrics.Port <= 0 || c.Metrics.Port > 65535 {
 			return fmt.Errorf("metrics port must be between 1 and 65535 (got %d)", c.Metrics.Port)
@@ -321,15 +370,19 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("metrics path is required when enabled")
 		}
 	}
+	return nil
+}
 
-	// Validate admin API
+func (c *Config) validateAdminAPI() error {
 	if c.AdminAPI.Enabled {
 		if c.AdminAPI.Port <= 0 || c.AdminAPI.Port > 65535 {
 			return fmt.Errorf("admin API port must be between 1 and 65535 (got %d)", c.AdminAPI.Port)
 		}
 	}
+	return nil
+}
 
-	// Validate logging
+func (c *Config) validateLogging() error {
 	validLogLevels := map[string]bool{
 		"debug": true,
 		"info":  true,
@@ -348,6 +401,5 @@ func (c *Config) Validate() error {
 	if c.Logging.Format != "" && !validLogFormats[c.Logging.Format] {
 		return fmt.Errorf("invalid log format: %s (valid: json, console)", c.Logging.Format)
 	}
-
 	return nil
 }

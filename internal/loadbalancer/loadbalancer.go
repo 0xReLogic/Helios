@@ -131,39 +131,10 @@ type LoadBalancer struct {
 
 // NewLoadBalancer creates a new load balancer with the specified strategy
 func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
-	var strategy Strategy
-
-	// Create the appropriate strategy based on configuration
-	switch cfg.LoadBalancer.Strategy {
-	case "round_robin":
-		strategy = NewRoundRobinStrategy()
-	case "least_connections":
-		strategy = NewLeastConnectionsStrategy()
-	case "weighted_round_robin":
-		strategy = NewWeightedRoundRobinStrategy()
-	case "ip_hash":
-		strategy = NewIPHashStrategy()
-	default:
-		// Default to round robin if not specified
-		strategy = NewRoundRobinStrategy()
-	}
-
-	// Create health checker
-	healthChecks := &healthChecker{
-		activeEnabled:     cfg.HealthChecks.Active.Enabled,
-		activeInterval:    time.Duration(cfg.HealthChecks.Active.Interval) * time.Second,
-		activeTimeout:     time.Duration(cfg.HealthChecks.Active.Timeout) * time.Second,
-		activePath:        cfg.HealthChecks.Active.Path,
-		passiveEnabled:    cfg.HealthChecks.Passive.Enabled,
-		passiveThreshold:  cfg.HealthChecks.Passive.UnhealthyThreshold,
-		passiveTimeout:    time.Duration(cfg.HealthChecks.Passive.UnhealthyTimeout) * time.Second,
-		unhealthyBackends: make(map[string]int),
-	}
-
-	// Create context for managing goroutines lifecycle
+	strategy := createStrategy(cfg.LoadBalancer.Strategy)
+	healthChecks := createHealthChecker(cfg)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Create the load balancer
 	lb := &LoadBalancer{
 		strategy:         strategy,
 		config:           cfg,
@@ -173,80 +144,9 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 		cancel:           cancel,
 	}
 
-	// Setup WebSocket connection pool if configured
-	if cfg.LoadBalancer.WebSocketPool.Enabled {
-		maxIdle := cfg.LoadBalancer.WebSocketPool.MaxIdle
-		if maxIdle <= 0 {
-			maxIdle = 10
-		}
-		maxActive := cfg.LoadBalancer.WebSocketPool.MaxActive
-		if maxActive <= 0 {
-			maxActive = 100
-		}
-		idleTimeout := time.Duration(cfg.LoadBalancer.WebSocketPool.IdleTimeoutSeconds) * time.Second
-		if idleTimeout <= 0 {
-			idleTimeout = 5 * time.Minute
-		}
-
-		lb.wsPool = NewWebSocketPool(maxIdle, maxActive, idleTimeout)
-		logging.L().Info().
-			Int("max_idle", maxIdle).
-			Int("max_active", maxActive).
-			Dur("idle_timeout", idleTimeout).
-			Msg("WebSocket connection pool enabled")
-	}
-
-	// Setup rate limiting if enabled
-	if cfg.RateLimit.Enabled {
-		maxTokens := cfg.RateLimit.MaxTokens
-		if maxTokens <= 0 {
-			maxTokens = 100 // Default
-		}
-		refillRate := time.Duration(cfg.RateLimit.RefillRate) * time.Second
-		if refillRate <= 0 {
-			refillRate = time.Second // Default
-		}
-		lb.rateLimiter = ratelimiter.NewTokenBucketRateLimiter(maxTokens, refillRate)
-		logging.L().Info().Int("max_tokens", maxTokens).Dur("refill_rate", refillRate).Msg("rate limiting enabled")
-	}
-
-	// Setup circuit breaker if enabled
-	if cfg.CircuitBreaker.Enabled {
-		cbSettings := circuitbreaker.Settings{
-			Name:             "helios-lb",
-			MaxRequests:      uint32(cfg.CircuitBreaker.MaxRequests),
-			Interval:         time.Duration(cfg.CircuitBreaker.IntervalSeconds) * time.Second,
-			Timeout:          time.Duration(cfg.CircuitBreaker.TimeoutSeconds) * time.Second,
-			FailureThreshold: uint32(cfg.CircuitBreaker.FailureThreshold),
-			SuccessThreshold: uint32(cfg.CircuitBreaker.SuccessThreshold),
-			OnStateChange: func(name string, from circuitbreaker.State, to circuitbreaker.State) {
-				logging.L().Info().Str("circuit_breaker", name).Str("from", from.String()).Str("to", to.String()).Msg("circuit breaker state changed")
-				// Update metrics
-				failureCount, successCount, requestCount := lb.circuitBreaker.Counts()
-				lb.metricsCollector.UpdateCircuitBreakerState(name, to.String(), failureCount, successCount, requestCount)
-			},
-		}
-
-		// Set defaults if not provided
-		if cbSettings.MaxRequests == 0 {
-			cbSettings.MaxRequests = 1
-		}
-		if cbSettings.Interval == 0 {
-			cbSettings.Interval = time.Minute
-		}
-		if cbSettings.Timeout == 0 {
-			cbSettings.Timeout = time.Minute
-		}
-		if cbSettings.FailureThreshold == 0 {
-			cbSettings.FailureThreshold = 5
-		}
-		if cbSettings.SuccessThreshold == 0 {
-			cbSettings.SuccessThreshold = 1
-		}
-
-		lb.circuitBreaker = circuitbreaker.NewCircuitBreaker(cbSettings)
-		logging.L().Info().Uint32("failure_threshold", cbSettings.FailureThreshold).Msg("circuit breaker enabled")
-	}
+	lb.setupWebSocketPool(cfg)
+	lb.setupRateLimiter(cfg)
+	lb.setupCircuitBreaker(cfg)
 
 	// Add backends from configuration
 	for _, backendCfg := range cfg.Backends {
@@ -255,7 +155,124 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 		}
 	}
 
-	// Start active health checks in a background goroutine if enabled
+	lb.startHealthChecks()
+
+	return lb, nil
+}
+
+func createStrategy(strategyName string) Strategy {
+	switch strategyName {
+	case "round_robin":
+		return NewRoundRobinStrategy()
+	case "least_connections":
+		return NewLeastConnectionsStrategy()
+	case "weighted_round_robin":
+		return NewWeightedRoundRobinStrategy()
+	case "ip_hash":
+		return NewIPHashStrategy()
+	default:
+		return NewRoundRobinStrategy()
+	}
+}
+
+func createHealthChecker(cfg *config.Config) *healthChecker {
+	return &healthChecker{
+		activeEnabled:     cfg.HealthChecks.Active.Enabled,
+		activeInterval:    time.Duration(cfg.HealthChecks.Active.Interval) * time.Second,
+		activeTimeout:     time.Duration(cfg.HealthChecks.Active.Timeout) * time.Second,
+		activePath:        cfg.HealthChecks.Active.Path,
+		passiveEnabled:    cfg.HealthChecks.Passive.Enabled,
+		passiveThreshold:  cfg.HealthChecks.Passive.UnhealthyThreshold,
+		passiveTimeout:    time.Duration(cfg.HealthChecks.Passive.UnhealthyTimeout) * time.Second,
+		unhealthyBackends: make(map[string]int),
+	}
+}
+
+func (lb *LoadBalancer) setupWebSocketPool(cfg *config.Config) {
+	if !cfg.LoadBalancer.WebSocketPool.Enabled {
+		return
+	}
+
+	maxIdle := cfg.LoadBalancer.WebSocketPool.MaxIdle
+	if maxIdle <= 0 {
+		maxIdle = 10
+	}
+	maxActive := cfg.LoadBalancer.WebSocketPool.MaxActive
+	if maxActive <= 0 {
+		maxActive = 100
+	}
+	idleTimeout := time.Duration(cfg.LoadBalancer.WebSocketPool.IdleTimeoutSeconds) * time.Second
+	if idleTimeout <= 0 {
+		idleTimeout = 5 * time.Minute
+	}
+
+	lb.wsPool = NewWebSocketPool(maxIdle, maxActive, idleTimeout)
+	logging.L().Info().
+		Int("max_idle", maxIdle).
+		Int("max_active", maxActive).
+		Dur("idle_timeout", idleTimeout).
+		Msg("WebSocket connection pool enabled")
+}
+
+func (lb *LoadBalancer) setupRateLimiter(cfg *config.Config) {
+	if !cfg.RateLimit.Enabled {
+		return
+	}
+
+	maxTokens := cfg.RateLimit.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 100
+	}
+	refillRate := time.Duration(cfg.RateLimit.RefillRate) * time.Second
+	if refillRate <= 0 {
+		refillRate = time.Second
+	}
+
+	lb.rateLimiter = ratelimiter.NewTokenBucketRateLimiter(maxTokens, refillRate)
+	logging.L().Info().Int("max_tokens", maxTokens).Dur("refill_rate", refillRate).Msg("rate limiting enabled")
+}
+
+func (lb *LoadBalancer) setupCircuitBreaker(cfg *config.Config) {
+	if !cfg.CircuitBreaker.Enabled {
+		return
+	}
+
+	cbSettings := circuitbreaker.Settings{
+		Name:             "helios-lb",
+		MaxRequests:      uint32(cfg.CircuitBreaker.MaxRequests),
+		Interval:         time.Duration(cfg.CircuitBreaker.IntervalSeconds) * time.Second,
+		Timeout:          time.Duration(cfg.CircuitBreaker.TimeoutSeconds) * time.Second,
+		FailureThreshold: uint32(cfg.CircuitBreaker.FailureThreshold),
+		SuccessThreshold: uint32(cfg.CircuitBreaker.SuccessThreshold),
+		OnStateChange: func(name string, from circuitbreaker.State, to circuitbreaker.State) {
+			logging.L().Info().Str("circuit_breaker", name).Str("from", from.String()).Str("to", to.String()).Msg("circuit breaker state changed")
+			failureCount, successCount, requestCount := lb.circuitBreaker.Counts()
+			lb.metricsCollector.UpdateCircuitBreakerState(name, to.String(), failureCount, successCount, requestCount)
+		},
+	}
+
+	// Set defaults
+	if cbSettings.MaxRequests == 0 {
+		cbSettings.MaxRequests = 1
+	}
+	if cbSettings.Interval == 0 {
+		cbSettings.Interval = time.Minute
+	}
+	if cbSettings.Timeout == 0 {
+		cbSettings.Timeout = time.Minute
+	}
+	if cbSettings.FailureThreshold == 0 {
+		cbSettings.FailureThreshold = 5
+	}
+	if cbSettings.SuccessThreshold == 0 {
+		cbSettings.SuccessThreshold = 1
+	}
+
+	lb.circuitBreaker = circuitbreaker.NewCircuitBreaker(cbSettings)
+	logging.L().Info().Uint32("failure_threshold", cbSettings.FailureThreshold).Msg("circuit breaker enabled")
+}
+
+func (lb *LoadBalancer) startHealthChecks() {
 	if lb.healthChecks.activeEnabled {
 		go lb.startActiveHealthChecks()
 		logging.L().Info().Dur("interval", lb.healthChecks.activeInterval).Msg("active health checks enabled")
@@ -268,8 +285,6 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 	} else {
 		logging.L().Info().Msg("passive health checks disabled")
 	}
-
-	return lb, nil
 }
 
 // startActiveHealthChecks starts a goroutine that periodically checks the health of all backends

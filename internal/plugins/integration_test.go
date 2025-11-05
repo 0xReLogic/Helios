@@ -12,6 +12,24 @@ import (
 	"github.com/0xReLogic/Helios/internal/config"
 )
 
+// Test constants to avoid duplication
+const (
+	testContentType     = "Content-Type"
+	testContentEncoding = "Content-Encoding"
+	testAcceptEncoding  = "Accept-Encoding"
+	testTextPlain       = "text/plain"
+	testApplicationJSON = "application/json"
+	testGzipEncoding    = "gzip"
+	testCustomHeader    = "X-Custom-Header"
+	testServerHeader    = "X-Server"
+	testAPIKey          = "X-API-Key"
+	testCustomAuth      = "custom-auth"
+	testOrderHeader     = "X-Order"
+	testShouldNotExist  = "X-Should-Not-Exist"
+	testBuildChainErr   = "Failed to build plugin chain: %v"
+	testExpectStatus200 = "Expected status 200, got %d"
+)
+
 // TestPluginChainIntegration tests the complete plugin chain with multiple plugins
 func TestPluginChainIntegration(t *testing.T) {
 	// Create a base handler that returns a simple response

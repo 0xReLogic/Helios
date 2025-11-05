@@ -6,6 +6,18 @@ import (
 	"testing"
 )
 
+// Test constants to avoid duplication
+const (
+	testBackendAddress    = "http://localhost:8080"
+	testHealthPath        = "/health"
+	testValidConfig       = "valid config"
+	testZeroTimeout       = "zero timeout"
+	testTempFileCreateErr = "Failed to create temp file: %v"
+	testTempFileWriteErr  = "Failed to write to temp file: %v"
+	testTempFileCloseErr  = "Failed to close temp file: %v"
+	testValidateErr       = "Validate() error = %v, wantErr %v"
+)
+
 func TestLoadConfig(t *testing.T) {
 	// Create a temporary config file
 	configContent := `
