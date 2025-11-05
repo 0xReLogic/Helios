@@ -1,7 +1,9 @@
 package ratelimiter
 
 import (
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -129,11 +131,15 @@ func RateLimitMiddleware(rateLimiter RateLimiter) func(http.Handler) http.Handle
 // getClientIP extracts the client IP from the request
 func getClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header first
+	// X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+	// We want only the first IP (the actual client)
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP in the list
-		if idx := len(xff); idx > 0 {
-			return xff[:idx]
+		// Find the first comma to extract the first IP
+		if idx := strings.Index(xff, ","); idx > 0 {
+			return strings.TrimSpace(xff[:idx])
 		}
+		// No comma means single IP
+		return strings.TrimSpace(xff)
 	}
 
 	// Check X-Real-IP header
@@ -141,6 +147,10 @@ func getClientIP(r *http.Request) string {
 		return xri
 	}
 
-	// Fall back to RemoteAddr
+	// Fall back to RemoteAddr (includes port, but that's ok for rate limiting)
+	// Could use net.SplitHostPort if we want just IP without port
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
 	return r.RemoteAddr
 }

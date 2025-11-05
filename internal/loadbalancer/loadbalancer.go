@@ -384,18 +384,18 @@ func (lb *LoadBalancer) AddBackend(backendCfg config.BackendConfig) error {
 
 	// Create a reverse proxy for this backend with optimized transport
 	proxy := httputil.NewSingleHostReverseProxy(backendURL)
-	
+
 	// Configure custom transport with timeouts (LEETCODE-STYLE OPTIMIZATION!)
 	dialTimeout := time.Duration(lb.config.Server.Timeouts.BackendDial) * time.Second
 	if dialTimeout == 0 {
 		dialTimeout = 10 * time.Second // Default: 10s dial timeout
 	}
-	
+
 	readTimeout := time.Duration(lb.config.Server.Timeouts.BackendRead) * time.Second
 	if readTimeout == 0 {
 		readTimeout = 30 * time.Second // Default: 30s backend read timeout
 	}
-	
+
 	idleConnTimeout := time.Duration(lb.config.Server.Timeouts.BackendIdle) * time.Second
 	if idleConnTimeout == 0 {
 		idleConnTimeout = 90 * time.Second // Default: 90s idle connection timeout
@@ -407,23 +407,23 @@ func (lb *LoadBalancer) AddBackend(backendCfg config.BackendConfig) error {
 			Timeout:   dialTimeout,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		
+
 		// Connection pooling (prevent connection exhaustion)
-		MaxIdleConns:          100,              // Total idle connections
-		MaxIdleConnsPerHost:   10,               // Per-host idle connections
-		MaxConnsPerHost:       100,              // Limit concurrent connections per host
-		IdleConnTimeout:       idleConnTimeout,
-		
+		MaxIdleConns:        100, // Total idle connections
+		MaxIdleConnsPerHost: 10,  // Per-host idle connections
+		MaxConnsPerHost:     100, // Limit concurrent connections per host
+		IdleConnTimeout:     idleConnTimeout,
+
 		// Timeouts
 		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: readTimeout,
 		ExpectContinueTimeout: 1 * time.Second,
-		
+
 		// Performance optimizations
-		ForceAttemptHTTP2:     true,  // Use HTTP/2 when available
-		DisableCompression:    false, // Let backend handle compression
+		ForceAttemptHTTP2:  true,  // Use HTTP/2 when available
+		DisableCompression: false, // Let backend handle compression
 	}
-	
+
 	proxy.Transport = transport
 
 	// Create the backend

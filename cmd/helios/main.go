@@ -183,7 +183,7 @@ func main() {
 				Dur("write_timeout", writeTimeout).
 				Dur("idle_timeout", idleTimeout).
 				Msg("server timeouts configured")
-			
+
 			serverErrors <- server.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile)
 		} else {
 			logger.Info().Int("port", cfg.Server.Port).Msg("listening for http")
@@ -192,7 +192,7 @@ func main() {
 				Dur("write_timeout", writeTimeout).
 				Dur("idle_timeout", idleTimeout).
 				Msg("server timeouts configured")
-			
+
 			serverErrors <- server.ListenAndServe()
 		}
 	}()

@@ -23,21 +23,21 @@ type Config struct {
 
 // ServerConfig holds the server configuration
 type ServerConfig struct {
-	Port     int            `yaml:"port"`
-	TLS      TLSConfig      `yaml:"tls,omitempty"`
+	Port     int           `yaml:"port"`
+	TLS      TLSConfig     `yaml:"tls,omitempty"`
 	Timeouts TimeoutConfig `yaml:"timeouts,omitempty"`
 }
 
 // TimeoutConfig holds HTTP server timeout settings
 type TimeoutConfig struct {
-	Read          int `yaml:"read"`           // ReadTimeout in seconds
-	Write         int `yaml:"write"`          // WriteTimeout in seconds
-	Idle          int `yaml:"idle"`           // IdleTimeout in seconds
-	Handler       int `yaml:"handler"`        // Handler timeout in seconds (end-to-end request)
-	Shutdown      int `yaml:"shutdown"`       // Graceful shutdown timeout in seconds
-	BackendDial   int `yaml:"backend_dial"`   // Backend connection dial timeout in seconds
-	BackendRead   int `yaml:"backend_read"`   // Backend response read timeout in seconds
-	BackendIdle   int `yaml:"backend_idle"`   // Backend idle connection timeout in seconds
+	Read        int `yaml:"read"`         // ReadTimeout in seconds
+	Write       int `yaml:"write"`        // WriteTimeout in seconds
+	Idle        int `yaml:"idle"`         // IdleTimeout in seconds
+	Handler     int `yaml:"handler"`      // Handler timeout in seconds (end-to-end request)
+	Shutdown    int `yaml:"shutdown"`     // Graceful shutdown timeout in seconds
+	BackendDial int `yaml:"backend_dial"` // Backend connection dial timeout in seconds
+	BackendRead int `yaml:"backend_read"` // Backend response read timeout in seconds
+	BackendIdle int `yaml:"backend_idle"` // Backend idle connection timeout in seconds
 }
 
 // TLSConfig holds the TLS configuration settings
