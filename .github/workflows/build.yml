@@ -62,7 +62,7 @@ jobs:
       run: go test -coverprofile=coverage.txt -covermode=atomic ./... -short  # Added -short flag
       
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3  # Updated to v3
+      uses: codecov/codecov-action@v5  # Updated to v3
       with:
         file: ./coverage.txt
         fail_ci_if_error: false
