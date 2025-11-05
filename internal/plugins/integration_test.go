@@ -36,7 +36,7 @@ func TestPluginChainIntegration(t *testing.T) {
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello from base handler"))
+		_, _ = w.Write([]byte("Hello from base handler"))
 	})
 
 	// Configure plugin chain: headers -> logging -> gzip
@@ -121,7 +121,7 @@ func TestPluginChainWithSizeLimit(t *testing.T) {
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Received: " + string(body)))
+		_, _ = w.Write([]byte("Received: " + string(body)))
 	})
 
 	pluginConfig := config.PluginsConfig{
@@ -172,7 +172,7 @@ func TestPluginChainWithSizeLimit(t *testing.T) {
 func TestPluginChainWithAuthentication(t *testing.T) {
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Authenticated"))
+		_, _ = w.Write([]byte("Authenticated"))
 	})
 
 	pluginConfig := config.PluginsConfig{
@@ -236,7 +236,7 @@ func TestPluginChainOrder(t *testing.T) {
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test"))
+		_, _ = w.Write([]byte("test"))
 	})
 
 	// Chain 1: headers -> gzip
@@ -285,7 +285,7 @@ func TestPluginChainOrder(t *testing.T) {
 func TestPluginChainDisabled(t *testing.T) {
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test"))
+		_, _ = w.Write([]byte("test"))
 	})
 
 	pluginConfig := config.PluginsConfig{
@@ -390,15 +390,13 @@ func TestPluginListAvailability(t *testing.T) {
 // TestComplexPluginChain tests a realistic multi-plugin scenario
 func TestComplexPluginChain(t *testing.T) {
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Read request body
-		body, _ := io.ReadAll(r.Body)
+	// Read request body
+	body, _ := io.ReadAll(r.Body)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message":"processed","received":"` + string(body) + `"}`))
-	})
-
-	// Complex chain: authentication -> size limit -> headers -> gzip -> logging
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"message":"processed","received":"` + string(body) + `"}`))
+})	// Complex chain: authentication -> size limit -> headers -> gzip -> logging
 	pluginConfig := config.PluginsConfig{
 		Enabled: true,
 		Chain: []config.PluginConfig{

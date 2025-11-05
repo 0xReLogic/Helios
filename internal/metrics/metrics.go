@@ -73,9 +73,8 @@ type CircuitBreakerMetrics struct {
 // MetricsCollector manages metrics collection
 type MetricsCollector struct {
 	metrics     *Metrics
-	metricsPool sync.Pool  // Pool for Metrics copies to reduce GC pressure
-	backendPool sync.Pool  // Pool for BackendMetrics copies
-	avgMutex    sync.Mutex // Separate mutex for average calculation to reduce contention
+	metricsPool sync.Pool // Pool for Metrics copies to reduce GC pressure
+	backendPool sync.Pool // Pool for BackendMetrics copies
 }
 
 // NewMetricsCollector creates a new metrics collector
