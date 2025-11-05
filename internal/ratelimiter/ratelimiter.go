@@ -13,20 +13,19 @@ type RateLimiter interface {
 	Allow(clientIP string) bool
 }
 
-// TokenBucketRateLimiter implements a token bucket rate limiter
+// TokenBucketRateLimiter implements a token bucket rate limiter with optimized concurrency
 type TokenBucketRateLimiter struct {
 	maxTokens   int           // Maximum number of tokens in the bucket
 	refillRate  time.Duration // Rate at which tokens are refilled
-	buckets     map[string]*bucket
-	mutex       sync.RWMutex
+	buckets     sync.Map      // Use sync.Map for better concurrent access
 	cleanupTick time.Duration
 }
 
-// bucket represents a token bucket for a specific client
+// bucket represents a token bucket for a specific client with lock-free fast path
 type bucket struct {
 	tokens     int
 	lastRefill time.Time
-	mutex      sync.Mutex
+	mutex      sync.Mutex // Only lock when modifying tokens
 }
 
 // NewTokenBucketRateLimiter creates a new token bucket rate limiter
@@ -34,7 +33,7 @@ func NewTokenBucketRateLimiter(maxTokens int, refillRate time.Duration) *TokenBu
 	rl := &TokenBucketRateLimiter{
 		maxTokens:   maxTokens,
 		refillRate:  refillRate,
-		buckets:     make(map[string]*bucket),
+		buckets:     sync.Map{}, // sync.Map doesn't need initialization
 		cleanupTick: time.Minute * 10, // Clean up old buckets every 10 minutes
 	}
 
@@ -44,18 +43,27 @@ func NewTokenBucketRateLimiter(maxTokens int, refillRate time.Duration) *TokenBu
 	return rl
 }
 
-// Allow checks if a request from the given client IP is allowed
+// Allow checks if a request from the given client IP is allowed with optimized locking
 func (rl *TokenBucketRateLimiter) Allow(clientIP string) bool {
-	rl.mutex.Lock()
-	b, exists := rl.buckets[clientIP]
+	// Fast path: try to load existing bucket without locking
+	value, exists := rl.buckets.Load(clientIP)
+	var b *bucket
+	
 	if !exists {
+		// Create new bucket
 		b = &bucket{
 			tokens:     rl.maxTokens,
 			lastRefill: time.Now(),
 		}
-		rl.buckets[clientIP] = b
+		// LoadOrStore ensures only one goroutine creates the bucket
+		actual, loaded := rl.buckets.LoadOrStore(clientIP, b)
+		if loaded {
+			// Another goroutine created it, use that one
+			b = actual.(*bucket)
+		}
+	} else {
+		b = value.(*bucket)
 	}
-	rl.mutex.Unlock()
 
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -94,19 +102,23 @@ func (rl *TokenBucketRateLimiter) cleanupRoutine() {
 
 // cleanup removes buckets that haven't been used for more than 1 hour
 func (rl *TokenBucketRateLimiter) cleanup() {
-	rl.mutex.Lock()
-	defer rl.mutex.Unlock()
-
 	now := time.Now()
 	cutoff := now.Add(-time.Hour)
 
-	for ip, b := range rl.buckets {
+	// Use sync.Map's Range method for iteration
+	rl.buckets.Range(func(key, value interface{}) bool {
+		ip := key.(string)
+		b := value.(*bucket)
+		
 		b.mutex.Lock()
-		if b.lastRefill.Before(cutoff) {
-			delete(rl.buckets, ip)
-		}
+		shouldDelete := b.lastRefill.Before(cutoff)
 		b.mutex.Unlock()
-	}
+		
+		if shouldDelete {
+			rl.buckets.Delete(ip)
+		}
+		return true // continue iteration
+	})
 }
 
 // RateLimitMiddleware wraps an http.Handler with rate limiting

@@ -29,7 +29,7 @@ func (s State) String() string {
 	}
 }
 
-// CircuitBreaker implements the circuit breaker pattern
+// CircuitBreaker implements the circuit breaker pattern with optimized locking
 type CircuitBreaker struct {
 	name             string
 	maxRequests      uint32        // Max requests allowed in half-open state
@@ -39,7 +39,8 @@ type CircuitBreaker struct {
 	successThreshold uint32        // Number of successes to close the circuit in half-open state
 	onStateChange    func(name string, from State, to State)
 
-	mutex           sync.Mutex
+	// Use RWMutex for better read concurrency (most requests just read state)
+	mutex           sync.RWMutex
 	state           State
 	failureCount    uint32
 	successCount    uint32
@@ -131,42 +132,64 @@ func (cb *CircuitBreaker) Call(fn func() error) error {
 	return cb.Execute(fn)
 }
 
-// beforeRequest checks if the request can proceed
+// beforeRequest checks if the request can proceed with optimized locking
 func (cb *CircuitBreaker) beforeRequest() error {
-	cb.mutex.Lock()
-	defer cb.mutex.Unlock()
-
 	now := time.Now()
-
-	switch cb.state {
-	case StateClosed:
-		// Reset counts if interval has passed
-		if cb.lastFailureTime.Add(cb.interval).Before(now) {
-			cb.failureCount = 0
+	
+	// Fast path: read-only check for most common case (StateClosed)
+	cb.mutex.RLock()
+	state := cb.state
+	
+	// Common case: circuit is closed and healthy
+	if state == StateClosed {
+		// Check if we need to reset counters
+		needsReset := !cb.lastFailureTime.IsZero() && cb.lastFailureTime.Add(cb.interval).Before(now)
+		cb.mutex.RUnlock()
+		
+		// Only acquire write lock if reset is needed
+		if needsReset {
+			cb.mutex.Lock()
+			// Double-check after acquiring write lock
+			if cb.lastFailureTime.Add(cb.interval).Before(now) {
+				cb.failureCount = 0
+			}
+			cb.mutex.Unlock()
 		}
 		return nil
-
-	case StateOpen:
-		// Check if timeout has passed to move to half-open
-		if cb.nextAttempt.Before(now) {
-			cb.setState(StateHalfOpen)
-			cb.requestCount = 0
-			cb.successCount = 0
+	}
+	
+	// For Open state, check if we can transition to HalfOpen
+	if state == StateOpen {
+		canRetry := cb.nextAttempt.Before(now)
+		cb.mutex.RUnlock()
+		
+		if canRetry {
+			cb.mutex.Lock()
+			// Double-check state hasn't changed
+			if cb.state == StateOpen && cb.nextAttempt.Before(now) {
+				cb.setState(StateHalfOpen)
+				cb.requestCount = 0
+				cb.successCount = 0
+			}
+			cb.mutex.Unlock()
 			return nil
 		}
 		return ErrCircuitBreakerOpen
-
-	case StateHalfOpen:
-		// Check if we've reached max requests in half-open state
-		if cb.requestCount >= cb.maxRequests {
+	}
+	
+	// HalfOpen state: check request limit
+	if state == StateHalfOpen {
+		atLimit := cb.requestCount >= cb.maxRequests
+		cb.mutex.RUnlock()
+		
+		if atLimit {
 			return ErrTooManyRequests
 		}
-		// Don't increment here, we'll increment in Execute
 		return nil
-
-	default:
-		return ErrCircuitBreakerOpen
 	}
+	
+	cb.mutex.RUnlock()
+	return ErrCircuitBreakerOpen
 }
 
 // afterRequest updates the circuit breaker state after a request
