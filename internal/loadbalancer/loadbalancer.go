@@ -74,6 +74,8 @@ func (lb *LoadBalancer) SetStrategy(name string) error {
 		newStrategy = NewWeightedRoundRobinStrategy()
 	case "ip_hash":
 		newStrategy = NewIPHashStrategy()
+	case "ip_hash_consistent":
+		newStrategy = NewIPHashConsistentStrategy()
 	default:
 		return fmt.Errorf("unknown strategy: %s", name)
 	}
@@ -170,6 +172,8 @@ func createStrategy(strategyName string) Strategy {
 		return NewWeightedRoundRobinStrategy()
 	case "ip_hash":
 		return NewIPHashStrategy()
+	case "ip_hash_consistent":
+		return NewIPHashConsistentStrategy()
 	default:
 		return NewRoundRobinStrategy()
 	}

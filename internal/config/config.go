@@ -279,9 +279,10 @@ func (c *Config) validateLoadBalancer() error {
 		"least_connections":    true,
 		"weighted_round_robin": true,
 		"ip_hash":              true,
+		"ip_hash_consistent":   true,
 	}
 	if c.LoadBalancer.Strategy != "" && !validStrategies[c.LoadBalancer.Strategy] {
-		return fmt.Errorf("invalid load balancer strategy: %s (valid: round_robin, least_connections, weighted_round_robin, ip_hash)", c.LoadBalancer.Strategy)
+		return fmt.Errorf("invalid load balancer strategy: %s (valid: round_robin, least_connections, weighted_round_robin, ip_hash, ip_hash_consistent)", c.LoadBalancer.Strategy)
 	}
 
 	// Validate WebSocket pool configuration if enabled

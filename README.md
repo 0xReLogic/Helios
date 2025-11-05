@@ -25,7 +25,8 @@ Helios is a modern, production-grade reverse proxy and load balancer for microse
   - Round Robin - Distributes requests sequentially across all healthy backends
   - Least Connections - Routes to the backend with the fewest active connections
   - Weighted Round Robin - Distributes requests based on user-assigned backend weights
-  - IP Hash - Ensures requests from the same client IP are routed to the same backend
+  - IP Hash - Ensures requests from the same client IP are routed to the same backend (perfect distribution, 90% remapping on scale)
+  - IP Hash Consistent - Jump Consistent Hash for minimal remapping when scaling (13% vs 90%, ideal for stateful apps)
 - **Intelligent Health Monitoring**:
   - Passive health checks - Detects failures from regular traffic patterns
   - Active health checks - Proactively monitors backend health with periodic requests
@@ -87,6 +88,7 @@ graph TD
             LoadBalancer --> LeastConn[Least Connections]
             LoadBalancer --> WeightedRR[Weighted Round Robin]
             LoadBalancer --> IPHash[IP Hash]
+            LoadBalancer --> IPHashConsistent[IP Hash Consistent]
         end
 
         subgraph "Monitoring & Metrics"
@@ -179,7 +181,7 @@ Helios is configured via `helios.yaml`:
 server:
   port: 8080 # Port for the proxy server
   tls:
-    enabled: true # Enable TLS/SSL termination
+    enabled: false # Enable TLS/SSL termination
     certFile: "certs/cert.pem" # Path to TLS certificate file
     keyFile: "certs/key.pem" # Path to TLS private key file
   timeouts:
@@ -204,22 +206,25 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "round_robin" # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
+  strategy: "ip_hash" # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash", "ip_hash_consistent"
+  # ip_hash: Fast, perfect distribution, but 90% remapping on scale (breaks sessions)
+  # ip_hash_consistent: Jump Hash - 50% slower, minimal remapping (13%), good for stateful apps
   websocket_pool:
     enabled: true # Enable WebSocket connection pooling
-    max_idle_per_backend: 10 # Maximum idle connections per backend
+    max_idle: 10 # Maximum idle connections per backend
+    max_active: 100 # Maximum active connections per backend (0 = unlimited)
     idle_timeout_seconds: 300 # Idle connection timeout (5 minutes)
 
 health_checks:
   active:
     enabled: true
-    interval: 5 # Interval in seconds
-    timeout: 3 # Timeout in seconds
-    path: "/health"
+    interval: 10 # Interval in seconds
+    timeout: 7 # Timeout in seconds
+    path: "/"
   passive:
     enabled: true
-    unhealthy_threshold: 10 # Number of failures before marking as unhealthy
-    unhealthy_timeout: 15 # Time in seconds to keep backend unhealthy
+    unhealthy_threshold: 3 # Number of failures before marking as unhealthy
+    unhealthy_timeout: 30 # Time in seconds to keep backend unhealthy
 
 rate_limit:
   enabled: true
@@ -228,11 +233,11 @@ rate_limit:
 
 circuit_breaker:
   enabled: true
-  max_requests: 100 # Max requests in half-open state
-  interval_seconds: 30 # Time window for failure counting
-  timeout_seconds: 15 # Time to wait before moving from open to half-open
-  failure_threshold: 50 # Number of failures to open circuit
-  success_threshold: 10 # Number of successes to close circuit
+  max_requests: 5 # Max requests in half-open state
+  interval_seconds: 60 # Time window for failure counting
+  timeout_seconds: 60 # Time to wait before moving from open to half-open
+  failure_threshold: 5 # Number of failures to open circuit
+  success_threshold: 2 # Number of successes to close circuit
 
 admin_api:
   enabled: true
@@ -247,7 +252,7 @@ metrics:
 logging:
   level: "info" # Log level: debug, info, warn, error
   format: "text" # Log format: text (console) or json (machine-readable)
-  include_caller: true # Include file and line number in logs
+  include_caller: false # Include file and line number in logs
   request_id:
     enabled: true # Auto-generate and propagate request IDs
     header: "X-Request-ID" # Header name for request ID
@@ -431,10 +436,11 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "round_robin" # round_robin, least_connections, weighted_round_robin, ip_hash
+  strategy: "round_robin" # round_robin, least_connections, weighted_round_robin, ip_hash, ip_hash_consistent
   websocket_pool:
     enabled: true
-    max_idle_per_backend: 10
+    max_idle: 10
+    max_active: 100
     idle_timeout_seconds: 300
 
 health_checks:

@@ -135,17 +135,17 @@ func (cb *CircuitBreaker) Call(fn func() error) error {
 // beforeRequest checks if the request can proceed with optimized locking
 func (cb *CircuitBreaker) beforeRequest() error {
 	now := time.Now()
-	
+
 	// Fast path: read-only check for most common case (StateClosed)
 	cb.mutex.RLock()
 	state := cb.state
-	
+
 	// Common case: circuit is closed and healthy
 	if state == StateClosed {
 		// Check if we need to reset counters
 		needsReset := !cb.lastFailureTime.IsZero() && cb.lastFailureTime.Add(cb.interval).Before(now)
 		cb.mutex.RUnlock()
-		
+
 		// Only acquire write lock if reset is needed
 		if needsReset {
 			cb.mutex.Lock()
@@ -157,12 +157,12 @@ func (cb *CircuitBreaker) beforeRequest() error {
 		}
 		return nil
 	}
-	
+
 	// For Open state, check if we can transition to HalfOpen
 	if state == StateOpen {
 		canRetry := cb.nextAttempt.Before(now)
 		cb.mutex.RUnlock()
-		
+
 		if canRetry {
 			cb.mutex.Lock()
 			// Double-check state hasn't changed
@@ -176,18 +176,18 @@ func (cb *CircuitBreaker) beforeRequest() error {
 		}
 		return ErrCircuitBreakerOpen
 	}
-	
+
 	// HalfOpen state: check request limit
 	if state == StateHalfOpen {
 		atLimit := cb.requestCount >= cb.maxRequests
 		cb.mutex.RUnlock()
-		
+
 		if atLimit {
 			return ErrTooManyRequests
 		}
 		return nil
 	}
-	
+
 	cb.mutex.RUnlock()
 	return ErrCircuitBreakerOpen
 }

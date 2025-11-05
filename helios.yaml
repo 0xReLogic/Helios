@@ -26,7 +26,14 @@ backends:
     weight: 1
 
 load_balancer:
-  strategy: "ip_hash" # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
+  strategy: "ip_hash" # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash", "ip_hash_consistent"
+  # ip_hash: Fast, perfect distribution, but 90% remapping on scale (breaks sessions)
+  # ip_hash_consistent: Jump Hash - 50% slower, minimal remapping (13%), good for stateful apps
+  websocket_pool:
+    enabled: true # Enable WebSocket connection pooling
+    max_idle: 10 # Maximum idle connections per backend
+    max_active: 100 # Maximum active connections per backend (0 = unlimited)
+    idle_timeout_seconds: 300 # Idle connection timeout (5 minutes)
 
 health_checks:
   active:

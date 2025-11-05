@@ -33,7 +33,7 @@ func NewTokenBucketRateLimiter(maxTokens int, refillRate time.Duration) *TokenBu
 	rl := &TokenBucketRateLimiter{
 		maxTokens:   maxTokens,
 		refillRate:  refillRate,
-		buckets:     sync.Map{}, // sync.Map doesn't need initialization
+		buckets:     sync.Map{},       // sync.Map doesn't need initialization
 		cleanupTick: time.Minute * 10, // Clean up old buckets every 10 minutes
 	}
 
@@ -48,7 +48,7 @@ func (rl *TokenBucketRateLimiter) Allow(clientIP string) bool {
 	// Fast path: try to load existing bucket without locking
 	value, exists := rl.buckets.Load(clientIP)
 	var b *bucket
-	
+
 	if !exists {
 		// Create new bucket
 		b = &bucket{
@@ -109,11 +109,11 @@ func (rl *TokenBucketRateLimiter) cleanup() {
 	rl.buckets.Range(func(key, value interface{}) bool {
 		ip := key.(string)
 		b := value.(*bucket)
-		
+
 		b.mutex.Lock()
 		shouldDelete := b.lastRefill.Before(cutoff)
 		b.mutex.Unlock()
-		
+
 		if shouldDelete {
 			rl.buckets.Delete(ip)
 		}
