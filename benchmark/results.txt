@@ -1,0 +1,95 @@
+=====================================
+NGINX VS HELIOS BENCHMARK RESULTS
+Date: Wed Nov  5 09:02:13 UTC 2025
+=====================================
+
+TEST 1: HELIOS (minimal config)
+=================================
+Running 30s test @ http://localhost:8080/
+  4 threads and 100 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    19.31ms   12.46ms 145.93ms   72.01%
+    Req/Sec     1.36k   213.87     2.09k    74.83%
+  Latency Distribution
+     50%   17.56ms
+     75%   25.63ms
+     90%   35.17ms
+     99%   59.29ms
+  163073 requests in 30.08s, 19.13MB read
+Requests/sec:   5421.99
+Transfer/sec:    651.27KB
+Running 30s test @ http://localhost:8080/
+  8 threads and 500 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    80.03ms   39.36ms 579.96ms   76.11%
+    Req/Sec   795.06    169.58     1.23k    72.56%
+  Latency Distribution
+     50%   74.80ms
+     75%   97.14ms
+     90%  125.08ms
+     99%  215.51ms
+  190191 requests in 30.08s, 22.31MB read
+Requests/sec:   6321.99
+Transfer/sec:    759.38KB
+Running 30s test @ http://localhost:8080/
+  12 threads and 1000 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   146.38ms   58.82ms 803.22ms   81.36%
+    Req/Sec   578.49    135.81     0.86k    76.13%
+  Latency Distribution
+     50%  139.40ms
+     75%  167.99ms
+     90%  200.09ms
+     99%  384.15ms
+  207572 requests in 30.10s, 24.35MB read
+Requests/sec:   6896.23
+Transfer/sec:    828.36KB
+
+TEST 2: NGINX (minimal config)
+=================================
+Running 30s test @ http://localhost:8081/
+  4 threads and 100 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    16.95ms    7.07ms 134.57ms   75.80%
+    Req/Sec     1.50k   201.84     2.24k    75.50%
+  Latency Distribution
+     50%   15.91ms
+     75%   20.24ms
+     90%   25.32ms
+     99%   40.51ms
+  179341 requests in 30.09s, 30.44MB read
+Requests/sec:   5960.70
+Transfer/sec:      1.01MB
+Running 30s test @ http://localhost:8081/
+  8 threads and 500 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    97.85ms   82.56ms   1.98s    98.36%
+    Req/Sec   671.19    129.38     1.46k    78.64%
+  Latency Distribution
+     50%   88.14ms
+     75%  103.83ms
+     90%  125.84ms
+     99%  216.98ms
+  160187 requests in 30.10s, 27.19MB read
+  Socket errors: connect 0, read 0, write 0, timeout 51
+Requests/sec:   5321.77
+Transfer/sec:      0.90MB
+Running 30s test @ http://localhost:8081/
+  12 threads and 1000 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   174.78ms   67.60ms   1.99s    84.54%
+    Req/Sec   439.27    150.65     1.49k    78.63%
+  Latency Distribution
+     50%  172.16ms
+     75%  199.42ms
+     90%  228.35ms
+     99%  313.64ms
+  155978 requests in 30.10s, 26.48MB read
+  Socket errors: connect 0, read 0, write 0, timeout 420
+Requests/sec:   5182.34
+Transfer/sec:      0.88MB
+
+=====================================
+[+] BENCHMARK COMPLETE!
+=====================================
+

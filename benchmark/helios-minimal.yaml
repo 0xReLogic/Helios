@@ -1,0 +1,59 @@
+# Minimal Helios config for fair benchmark against Nginx
+# All fancy features DISABLED
+
+server:
+  port: 8080
+  tls:
+    enabled: false
+
+  timeouts:
+    read: 30
+    write: 30
+    idle: 60
+    shutdown: 10
+    backend_dial: 10
+    backend_read: 30
+    backend_idle: 90
+
+backends:
+  - name: backend1
+    address: "http://localhost:9001"
+    weight: 1
+  - name: backend2
+    address: "http://localhost:9002"
+    weight: 1
+  - name: backend3
+    address: "http://localhost:9003"
+    weight: 1
+
+loadbalancer:
+  strategy: "round_robin"
+  websocket_pool:
+    enabled: false
+
+# DISABLE all fancy features for fair comparison
+health_checks:
+  active:
+    enabled: false
+  passive:
+    enabled: false
+
+rate_limit:
+  enabled: false
+
+circuit_breaker:
+  enabled: false
+
+metrics:
+  enabled: false
+
+admin_api:
+  enabled: false
+
+plugins:
+  enabled: false
+
+logging:
+  level: "error"  # Minimal logging for performance
+  format: "json"
+  output: "stdout"
