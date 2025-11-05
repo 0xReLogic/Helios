@@ -14,23 +14,22 @@ import (
 
 // Test constants to avoid duplication
 const (
-	testContentType           = "Content-Type"
-	testTextPlain             = "text/plain"
-	testApplicationJSON       = "application/json"
-	testCustomHeader          = "X-Custom-Header"
-	testServerHeader          = "X-Server"
-	testFailedBuildPlugin     = "Failed to build plugin chain: %v"
-	testAcceptEncoding        = "Accept-Encoding"
-	testExpectedStatus200     = "Expected status 200, got %d"
-	testContentEncoding       = "Content-Encoding"
-	testCustomAuth            = "custom-auth"
-	testAPIKey                = "X-API-Key"
-	testOrderHeader           = "X-Order"
-	testShouldNotExistHeader  = "X-Should-Not-Exist"
-	testAPIVersionHeader      = "X-API-Version"
-	testPoweredByHeader       = "X-Powered-By"
+	testContentType          = "Content-Type"
+	testTextPlain            = "text/plain"
+	testApplicationJSON      = "application/json"
+	testCustomHeader         = "X-Custom-Header"
+	testServerHeader         = "X-Server"
+	testFailedBuildPlugin    = "Failed to build plugin chain: %v"
+	testAcceptEncoding       = "Accept-Encoding"
+	testExpectedStatus200    = "Expected status 200, got %d"
+	testContentEncoding      = "Content-Encoding"
+	testCustomAuth           = "custom-auth"
+	testAPIKey               = "X-API-Key"
+	testOrderHeader          = "X-Order"
+	testShouldNotExistHeader = "X-Should-Not-Exist"
+	testAPIVersionHeader     = "X-API-Version"
+	testPoweredByHeader      = "X-Powered-By"
 )
-
 
 // TestPluginChainIntegration tests the complete plugin chain with multiple plugins
 func TestPluginChainIntegration(t *testing.T) {
@@ -50,7 +49,7 @@ func TestPluginChainIntegration(t *testing.T) {
 				Config: map[string]interface{}{
 					"set": map[string]interface{}{
 						testCustomHeader: "test-value",
-						testServerHeader:        "Helios",
+						testServerHeader: "Helios",
 					},
 				},
 			},

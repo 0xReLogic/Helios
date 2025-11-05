@@ -106,7 +106,7 @@ func (p *WebSocketPool) Put(backend string, conn net.Conn) bool {
 
 	// Don't exceed max idle connections
 	if len(pool.idle) >= p.maxIdle {
-		conn.Close()
+		_ = conn.Close()
 		return false
 	}
 
@@ -122,7 +122,7 @@ func (p *WebSocketPool) Put(backend string, conn net.Conn) bool {
 // Close closes a connection and decrements active count
 func (p *WebSocketPool) Close(backend string, conn net.Conn) {
 	if conn != nil {
-		conn.Close()
+		_ = conn.Close()
 	}
 
 	p.mu.RLock()
