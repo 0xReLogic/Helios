@@ -35,10 +35,153 @@ func TestMetricsCollector(t *testing.T) {
 		t.Errorf("Expected 1 failed request, got %d", metrics.FailedRequests)
 	}
 
-	// Verify average response time
-	expectedAvg := (100.0 + 200.0) / 2.0 // 150ms
+	// Verify average response time (using EMA)
+	// With alpha=0.2: EMA = 0.2*new + 0.8*old
+	// First: EMA = 100
+	// Second: EMA = 0.2*200 + 0.8*100 = 40 + 80 = 120
+	expectedAvg := 120.0
 	if metrics.AverageResponseTime != expectedAvg {
 		t.Errorf("Expected average response time %.1f, got %.1f", expectedAvg, metrics.AverageResponseTime)
+	}
+}
+
+func TestExponentialMovingAverage(t *testing.T) {
+	mc := NewMetricsCollector()
+
+	// Test EMA behavior with multiple requests
+	mc.RecordRequest()
+	mc.RecordResponse(true, 100*time.Millisecond)
+	
+	mc.RecordRequest()
+	mc.RecordResponse(true, 200*time.Millisecond)
+	
+	mc.RecordRequest()
+	mc.RecordResponse(true, 300*time.Millisecond)
+
+	metrics := mc.GetMetrics()
+
+	// With alpha=0.2:
+	// 1st: EMA = 100
+	// 2nd: EMA = 0.2*200 + 0.8*100 = 40 + 80 = 120
+	// 3rd: EMA = 0.2*300 + 0.8*120 = 60 + 96 = 156
+	expectedAvg := 156.0
+	if metrics.AverageResponseTime != expectedAvg {
+		t.Errorf("Expected EMA %.1f, got %.1f", expectedAvg, metrics.AverageResponseTime)
+	}
+}
+
+func TestBackendEMA(t *testing.T) {
+	mc := NewMetricsCollector()
+
+	// Test backend-specific EMA
+	mc.RecordBackendRequest("test", true, 100*time.Millisecond)
+	mc.RecordBackendRequest("test", true, 300*time.Millisecond)
+
+	metrics := mc.GetMetrics()
+	backend := metrics.BackendMetrics["test"]
+
+	// With alpha=0.2:
+	// 1st: EMA = 100
+	// 2nd: EMA = 0.2*300 + 0.8*100 = 60 + 80 = 140
+	expectedAvg := 140.0
+	if backend.AverageResponseTime != expectedAvg {
+		t.Errorf("Expected backend EMA %.1f, got %.1f", expectedAvg, backend.AverageResponseTime)
+	}
+}
+
+func TestNoMemoryOverflow(t *testing.T) {
+	mc := NewMetricsCollector()
+
+	// Simulate many requests to verify no overflow
+	for i := 0; i < 10000; i++ {
+		mc.RecordRequest()
+		mc.RecordResponse(true, 50*time.Millisecond)
+	}
+
+	metrics := mc.GetMetrics()
+
+	// Average should converge to ~50ms due to EMA
+	if metrics.AverageResponseTime < 45 || metrics.AverageResponseTime > 55 {
+		t.Errorf("Expected EMA to converge to ~50ms, got %.1fms", metrics.AverageResponseTime)
+	}
+
+	// Ensure total requests is counted correctly
+	if metrics.TotalRequests != 10000 {
+		t.Errorf("Expected 10000 requests, got %d", metrics.TotalRequests)
+	}
+}
+
+func TestMaxBackendsLimit(t *testing.T) {
+	mc := NewMetricsCollector()
+
+	// Try to add more than MaxBackendMetrics
+	for i := 0; i < MaxBackendMetrics+100; i++ {
+		backendName := "backend-" + string(rune(i))
+		mc.RecordBackendRequest(backendName, true, 50*time.Millisecond)
+	}
+
+	metrics := mc.GetMetrics()
+
+	// Should not exceed max limit
+	if len(metrics.BackendMetrics) > MaxBackendMetrics {
+		t.Errorf("Backend metrics exceeded limit: got %d, max %d", 
+			len(metrics.BackendMetrics), MaxBackendMetrics)
+	}
+}
+
+func TestMaxCircuitBreakerLimit(t *testing.T) {
+	mc := NewMetricsCollector()
+
+	// Try to add more than MaxCircuitBreakerMetrics
+	for i := 0; i < MaxCircuitBreakerMetrics+10; i++ {
+		cbName := "cb-" + string(rune(i))
+		mc.UpdateCircuitBreakerState(cbName, "closed", 0, 0, 0)
+	}
+
+	metrics := mc.GetMetrics()
+
+	// Should not exceed max limit
+	if len(metrics.CircuitBreakerMetrics) > MaxCircuitBreakerMetrics {
+		t.Errorf("Circuit breaker metrics exceeded limit: got %d, max %d",
+			len(metrics.CircuitBreakerMetrics), MaxCircuitBreakerMetrics)
+	}
+}
+
+func TestConcurrentMetricsAccess(t *testing.T) {
+	mc := NewMetricsCollector()
+	done := make(chan bool)
+
+	// Concurrent writes
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			for j := 0; j < 100; j++ {
+				mc.RecordRequest()
+				mc.RecordResponse(true, time.Duration(j)*time.Millisecond)
+				mc.RecordBackendRequest("backend-1", true, 50*time.Millisecond)
+			}
+			done <- true
+		}(i)
+	}
+
+	// Concurrent reads
+	go func() {
+		for i := 0; i < 100; i++ {
+			_ = mc.GetMetrics()
+			time.Sleep(1 * time.Millisecond)
+		}
+		done <- true
+	}()
+
+	// Wait for all goroutines
+	for i := 0; i < 11; i++ {
+		<-done
+	}
+
+	metrics := mc.GetMetrics()
+
+	// Verify metrics were collected correctly
+	if metrics.TotalRequests != 1000 {
+		t.Errorf("Expected 1000 total requests, got %d", metrics.TotalRequests)
 	}
 }
 
