@@ -343,7 +343,7 @@ func TestPluginChainNilBaseHandler(t *testing.T) {
 // TestPluginListAvailability tests that all registered plugins are listed
 func TestPluginListAvailability(t *testing.T) {
 	plugins := List()
-	
+
 	expectedPlugins := []string{
 		"gzip",
 		"custom-auth",
@@ -374,7 +374,7 @@ func TestComplexPluginChain(t *testing.T) {
 	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Read request body
 		body, _ := io.ReadAll(r.Body)
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"message":"processed","received":"` + string(body) + `"}`))

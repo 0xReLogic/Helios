@@ -43,7 +43,16 @@ type BackendConfig struct {
 
 // LoadBalancerConfig holds the load balancer configuration
 type LoadBalancerConfig struct {
-	Strategy string `yaml:"strategy"`
+	Strategy      string               `yaml:"strategy"`
+	WebSocketPool WebSocketPoolConfig `yaml:"websocket_pool"`
+}
+
+// WebSocketPoolConfig holds WebSocket connection pool settings
+type WebSocketPoolConfig struct {
+	Enabled            bool `yaml:"enabled"`
+	MaxIdle            int  `yaml:"max_idle"`
+	MaxActive          int  `yaml:"max_active"`
+	IdleTimeoutSeconds int  `yaml:"idle_timeout_seconds"`
 }
 
 // HealthChecksConfig holds the health check configuration
@@ -194,6 +203,22 @@ func (c *Config) Validate() error {
 	}
 	if c.LoadBalancer.Strategy != "" && !validStrategies[c.LoadBalancer.Strategy] {
 		return fmt.Errorf("invalid load balancer strategy: %s (valid: round_robin, least_connections, weighted_round_robin, ip_hash)", c.LoadBalancer.Strategy)
+	}
+
+	// Validate WebSocket pool configuration if enabled
+	if c.LoadBalancer.WebSocketPool.Enabled {
+		if c.LoadBalancer.WebSocketPool.MaxIdle < 0 {
+			return fmt.Errorf("websocket pool max_idle must be non-negative (got %d)", c.LoadBalancer.WebSocketPool.MaxIdle)
+		}
+		if c.LoadBalancer.WebSocketPool.MaxActive < 0 {
+			return fmt.Errorf("websocket pool max_active must be non-negative (got %d)", c.LoadBalancer.WebSocketPool.MaxActive)
+		}
+		if c.LoadBalancer.WebSocketPool.MaxActive > 0 && c.LoadBalancer.WebSocketPool.MaxIdle > c.LoadBalancer.WebSocketPool.MaxActive {
+			return fmt.Errorf("websocket pool max_idle (%d) must be less than or equal to max_active (%d)", c.LoadBalancer.WebSocketPool.MaxIdle, c.LoadBalancer.WebSocketPool.MaxActive)
+		}
+		if c.LoadBalancer.WebSocketPool.IdleTimeoutSeconds < 0 {
+			return fmt.Errorf("websocket pool idle_timeout_seconds must be non-negative (got %d)", c.LoadBalancer.WebSocketPool.IdleTimeoutSeconds)
+		}
 	}
 
 	// Validate active health checks

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -274,6 +275,107 @@ func TestValidateLoadBalancerStrategy(t *testing.T) {
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateWebSocketPool(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  WebSocketPoolConfig
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "disabled pool",
+			config:  WebSocketPoolConfig{Enabled: false},
+			wantErr: false,
+		},
+		{
+			name: "valid config",
+			config: WebSocketPoolConfig{
+				Enabled:            true,
+				MaxIdle:            10,
+				MaxActive:          100,
+				IdleTimeoutSeconds: 300,
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative max_idle",
+			config: WebSocketPoolConfig{
+				Enabled:            true,
+				MaxIdle:            -1,
+				MaxActive:          100,
+				IdleTimeoutSeconds: 300,
+			},
+			wantErr: true,
+			errMsg:  "max_idle must be non-negative",
+		},
+		{
+			name: "negative max_active",
+			config: WebSocketPoolConfig{
+				Enabled:            true,
+				MaxIdle:            10,
+				MaxActive:          -1,
+				IdleTimeoutSeconds: 300,
+			},
+			wantErr: true,
+			errMsg:  "max_active must be non-negative",
+		},
+		{
+			name: "max_idle > max_active",
+			config: WebSocketPoolConfig{
+				Enabled:            true,
+				MaxIdle:            100,
+				MaxActive:          10,
+				IdleTimeoutSeconds: 300,
+			},
+			wantErr: true,
+			errMsg:  "max_idle",
+		},
+		{
+			name: "negative idle_timeout",
+			config: WebSocketPoolConfig{
+				Enabled:            true,
+				MaxIdle:            10,
+				MaxActive:          100,
+				IdleTimeoutSeconds: -1,
+			},
+			wantErr: true,
+			errMsg:  "idle_timeout_seconds must be non-negative",
+		},
+		{
+			name: "zero values allowed",
+			config: WebSocketPoolConfig{
+				Enabled:            true,
+				MaxIdle:            0,
+				MaxActive:          0,
+				IdleTimeoutSeconds: 0,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				Server:   ServerConfig{Port: 8080},
+				Backends: []BackendConfig{{Name: "test", Address: "http://localhost:8080"}},
+				LoadBalancer: LoadBalancerConfig{
+					Strategy:      "round_robin",
+					WebSocketPool: tt.config,
+				},
+			}
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && tt.errMsg != "" {
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("Validate() error = %v, expected to contain %q", err, tt.errMsg)
+				}
 			}
 		})
 	}

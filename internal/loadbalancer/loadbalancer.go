@@ -125,6 +125,7 @@ type LoadBalancer struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
 	healthCheckWg    sync.WaitGroup
+	wsPool           *WebSocketPool
 }
 
 // NewLoadBalancer creates a new load balancer with the specified strategy
@@ -169,6 +170,29 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 		metricsCollector: metrics.NewMetricsCollector(),
 		ctx:              ctx,
 		cancel:           cancel,
+	}
+
+	// Setup WebSocket connection pool if configured
+	if cfg.LoadBalancer.WebSocketPool.Enabled {
+		maxIdle := cfg.LoadBalancer.WebSocketPool.MaxIdle
+		if maxIdle <= 0 {
+			maxIdle = 10
+		}
+		maxActive := cfg.LoadBalancer.WebSocketPool.MaxActive
+		if maxActive <= 0 {
+			maxActive = 100
+		}
+		idleTimeout := time.Duration(cfg.LoadBalancer.WebSocketPool.IdleTimeoutSeconds) * time.Second
+		if idleTimeout <= 0 {
+			idleTimeout = 5 * time.Minute
+		}
+		
+		lb.wsPool = NewWebSocketPool(maxIdle, maxActive, idleTimeout)
+		logging.L().Info().
+			Int("max_idle", maxIdle).
+			Int("max_active", maxActive).
+			Dur("idle_timeout", idleTimeout).
+			Msg("WebSocket connection pool enabled")
 	}
 
 	// Setup rate limiting if enabled
@@ -660,5 +684,12 @@ func (lb *LoadBalancer) Stop() {
 	logging.L().Info().Msg("shutting down load balancer")
 	lb.cancel()
 	lb.healthCheckWg.Wait()
+	
+	// Shutdown WebSocket pool if enabled
+	if lb.wsPool != nil {
+		lb.wsPool.Shutdown()
+		logging.L().Info().Msg("WebSocket connection pool shutdown complete")
+	}
+	
 	logging.L().Info().Msg("load balancer shutdown complete")
 }
