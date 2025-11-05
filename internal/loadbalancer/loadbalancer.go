@@ -2,6 +2,7 @@ package loadbalancer
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -121,6 +122,9 @@ type LoadBalancer struct {
 	rateLimiter      ratelimiter.RateLimiter
 	circuitBreaker   *circuitbreaker.CircuitBreaker
 	metricsCollector *metrics.MetricsCollector
+	ctx              context.Context
+	cancel           context.CancelFunc
+	healthCheckWg    sync.WaitGroup
 }
 
 // NewLoadBalancer creates a new load balancer with the specified strategy
@@ -154,12 +158,17 @@ func NewLoadBalancer(cfg *config.Config) (*LoadBalancer, error) {
 		unhealthyBackends: make(map[string]int),
 	}
 
+	// Create context for managing goroutines lifecycle
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Create the load balancer
 	lb := &LoadBalancer{
 		strategy:         strategy,
 		config:           cfg,
 		healthChecks:     healthChecks,
 		metricsCollector: metrics.NewMetricsCollector(),
+		ctx:              ctx,
+		cancel:           cancel,
 	}
 
 	// Setup rate limiting if enabled
@@ -248,9 +257,16 @@ func (lb *LoadBalancer) startActiveHealthChecks() {
 	// Run an initial health check immediately
 	lb.checkBackendsHealth()
 
-	// Use for range instead of for { select {} }
-	for range ticker.C {
-		lb.checkBackendsHealth()
+	// Monitor ticker and context cancellation
+	for {
+		select {
+		case <-lb.ctx.Done():
+			logging.L().Info().Msg("stopping active health checks")
+			lb.healthCheckWg.Wait()
+			return
+		case <-ticker.C:
+			lb.checkBackendsHealth()
+		}
 	}
 }
 
@@ -261,22 +277,33 @@ func (lb *LoadBalancer) checkBackendsHealth() {
 	lb.mutex.RUnlock()
 
 	for _, backend := range backends {
-		go lb.checkBackendHealth(backend)
+		lb.healthCheckWg.Add(1)
+		go func(b *Backend) {
+			defer lb.healthCheckWg.Done()
+			lb.checkBackendHealth(b)
+		}(backend)
 	}
 }
 
 // checkBackendHealth checks the health of a single backend
 func (lb *LoadBalancer) checkBackendHealth(backend *Backend) {
+	// Check if context is cancelled before starting health check
+	select {
+	case <-lb.ctx.Done():
+		return
+	default:
+	}
+
 	// Skip health check if the backend is already marked as unhealthy
 	if !lb.IsBackendHealthy(backend) {
 		return
 	}
 
-	// Create a health check request
+	// Create a health check request with context
 	healthURL := *backend.URL
 	healthURL.Path = lb.healthChecks.activePath
 
-	req, err := http.NewRequest("GET", healthURL.String(), nil)
+	req, err := http.NewRequestWithContext(lb.ctx, "GET", healthURL.String(), nil)
 	if err != nil {
 		logging.L().Error().Str("backend", backend.Name).Err(err).Msg("error creating health check request")
 		return
@@ -619,4 +646,12 @@ func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, fmt.Errorf("response writer does not implement http.Hijacker")
 	}
 	return h.Hijack()
+}
+
+// Stop gracefully shuts down the load balancer and waits for all health check goroutines to finish
+func (lb *LoadBalancer) Stop() {
+	logging.L().Info().Msg("shutting down load balancer")
+	lb.cancel()
+	lb.healthCheckWg.Wait()
+	logging.L().Info().Msg("load balancer shutdown complete")
 }
