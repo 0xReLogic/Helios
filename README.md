@@ -49,14 +49,20 @@ Helios is a modern, production-grade reverse proxy and load balancer for microse
   - Optimized string operations (2.5x faster parsing)
   - Object pooling for zero-allocation metric copies
 - **Reliability**: Automatic failover when backends become unhealthy
-- **Admin API**: Runtime backend management, strategy switching, and JSON metrics/health
+- **Admin API**: Runtime management with JWT authentication:
+  - Add/remove backends dynamically
+  - Switch load balancing strategies on-the-fly
+  - Real-time metrics and health status
+  - Backend status monitoring
+  - Circuit breaker statistics
 - **Structured Logging**: Configurable JSON or text logs with request/trace identifiers
 - **Plugin Middleware**: Configurable middleware chain with built-in plugins:
   - Logging - Request/response logging with trace IDs
-  - Size Limit - DoS protection via payload size limits
-  - Gzip Compression - Response compression with 10MB buffer limit
-  - Headers - Custom header injection
-  - Request ID - Auto-generated request identifiers
+  - Size Limit - DoS protection via payload size limits (10MB request, 50MB response)
+  - Gzip Compression - Response compression with 10MB buffer limit and streaming fallback
+  - Headers - Custom header injection for requests and responses
+  - Request ID - Auto-generated request identifiers with propagation
+  - Custom Auth (example) - API key-based authentication middleware
 
 ## Architecture
 
@@ -464,10 +470,45 @@ Access real-time metrics at `http://localhost:9090/metrics` (Prometheus format)
 
 ### Admin API
 
-- Runtime backend management
-- Strategy switching
-- Health status monitoring
-- JWT-protected endpoints
+The Admin API provides runtime control and monitoring capabilities with JWT authentication.
+
+**Available Endpoints:**
+- `GET /v1/health` - Health check endpoint (public, no auth required)
+- `GET /v1/metrics` - Retrieve detailed metrics (requires auth)
+- `GET /v1/backends` - List all backends with health status (requires auth)
+- `POST /v1/backends/add` - Dynamically add new backend (requires auth)
+- `POST /v1/backends/remove` - Remove backend from pool (requires auth)
+- `POST /v1/strategy` - Switch load balancing strategy at runtime (requires auth)
+
+**Authentication:**
+All endpoints except `/v1/health` require a JWT token passed via the `Authorization: Bearer <token>` header.
+
+**Example Usage:**
+```bash
+# Check health (no auth)
+curl http://localhost:9091/v1/health
+
+# Get backend status
+curl -H "Authorization: Bearer change-me" http://localhost:9091/v1/backends
+
+# Add a new backend
+curl -X POST -H "Authorization: Bearer change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"server4","address":"http://localhost:8084","weight":1}' \
+  http://localhost:9091/v1/backends/add
+
+# Remove a backend
+curl -X POST -H "Authorization: Bearer change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"server4"}' \
+  http://localhost:9091/v1/backends/remove
+
+# Switch load balancing strategy
+curl -X POST -H "Authorization: Bearer change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"strategy":"least_connections"}' \
+  http://localhost:9091/v1/strategy
+```
 
 ### Health Checks
 

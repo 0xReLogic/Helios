@@ -200,33 +200,33 @@ func TestMatchesContentType(t *testing.T) {
 
 func TestGzipMaxBufferSize(t *testing.T) {
 	tests := []struct {
-		name         string
-		responseSize int
+		name           string
+		responseSize   int
 		shouldCompress bool
 	}{
 		{
-			name:         "Small response - should compress",
-			responseSize: 1024, // 1KB
+			name:           "Small response - should compress",
+			responseSize:   1024, // 1KB
 			shouldCompress: true,
 		},
 		{
-			name:         "Medium response - should compress",
-			responseSize: 1024 * 1024, // 1MB
+			name:           "Medium response - should compress",
+			responseSize:   1024 * 1024, // 1MB
 			shouldCompress: true,
 		},
 		{
-			name:         "Large response under limit - should compress",
-			responseSize: 9 * 1024 * 1024, // 9MB
+			name:           "Large response under limit - should compress",
+			responseSize:   9 * 1024 * 1024, // 9MB
 			shouldCompress: true,
 		},
 		{
-			name:         "Large response over limit - should NOT compress",
-			responseSize: 11 * 1024 * 1024, // 11MB > 10MB limit
+			name:           "Large response over limit - should NOT compress",
+			responseSize:   11 * 1024 * 1024, // 11MB > 10MB limit
 			shouldCompress: false,
 		},
 		{
-			name:         "Very large response - should NOT compress",
-			responseSize: 50 * 1024 * 1024, // 50MB
+			name:           "Very large response - should NOT compress",
+			responseSize:   50 * 1024 * 1024, // 50MB
 			shouldCompress: false,
 		},
 	}

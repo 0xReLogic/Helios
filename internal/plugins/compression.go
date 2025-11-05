@@ -27,7 +27,7 @@ type gzipResponseWriter struct {
 	level        int
 	contentTypes []string
 
-	buf          bytes.Buffer
+	buf            bytes.Buffer
 	bufferExceeded bool // Track if we exceeded max buffer size
 }
 
