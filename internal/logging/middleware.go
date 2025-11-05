@@ -59,6 +59,8 @@ func RequestContextMiddleware(cfg config.LoggingConfig) func(http.Handler) http.
 func generateIdentifier(prefix string) string {
 	b := make([]byte, 12)
 	if _, err := rand.Read(b); err != nil {
+		// Log the error before falling back to timestamp-based ID
+		L().Warn().Err(err).Msg("failed to generate random identifier, falling back to timestamp")
 		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
 	}
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
