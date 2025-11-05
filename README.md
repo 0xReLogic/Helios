@@ -19,29 +19,44 @@ Helios is a modern, production-grade reverse proxy and load balancer for microse
 ## Features
 
 - **HTTP Reverse Proxy**: Efficiently forwards HTTP requests to backend servers
-- **WebSocket Proxy**: Full support for proxying WebSocket connections.
-- **TLS/SSL Termination**: Secures traffic by terminating TLS connections.
+- **WebSocket Proxy**: Full support for proxying WebSocket connections with connection pooling
+- **TLS/SSL Termination**: Secures traffic by terminating TLS connections
 - **Advanced Load Balancing**: Multiple distribution strategies:
   - Round Robin - Distributes requests sequentially across all healthy backends
   - Least Connections - Routes to the backend with the fewest active connections
-  - Weighted Round Robin - Distributes requests based on user-assigned backend weights.
-  - IP Hash - Ensures requests from the same client IP are routed to the same backend.
+  - Weighted Round Robin - Distributes requests based on user-assigned backend weights
+  - IP Hash - Ensures requests from the same client IP are routed to the same backend
 - **Intelligent Health Monitoring**:
   - Passive health checks - Detects failures from regular traffic patterns
   - Active health checks - Proactively monitors backend health with periodic requests
-- **Request Rate Limiting**: Token bucket algorithm to prevent abuse and ensure fair usage
+- **Request Rate Limiting**: Token bucket algorithm with proper IP parsing to prevent abuse and ensure fair usage
 - **Circuit Breaker Pattern**: Prevents cascading failures by temporarily blocking requests to unhealthy services
+- **Comprehensive Timeout Controls**:
+  - Server-side timeouts (read, write, idle, handler, shutdown)
+  - Backend-specific timeouts (dial, read, idle)
+  - Protection against slow-read/write attacks
+- **WebSocket Connection Pooling**: Per-backend connection pools with configurable idle limits
 - **Metrics and Monitoring**:
-  - Real-time metrics collection and exposure
+  - Real-time metrics collection with Exponential Moving Average (EMA)
+  - Lock-free atomic operations for minimal overhead
+  - Memory-bounded metrics (~60% less GC pressure)
   - Health status endpoints
   - Backend performance monitoring
   - Request/response statistics
-- **Configuration**: Simple YAML-based configuration
-- **Performance**: Low memory footprint and high throughput
+- **Configuration**: Simple YAML-based configuration with comprehensive validation
+- **Performance**: 
+  - Low memory footprint and high throughput
+  - Optimized string operations (2.5x faster parsing)
+  - Object pooling for zero-allocation metric copies
 - **Reliability**: Automatic failover when backends become unhealthy
 - **Admin API**: Runtime backend management, strategy switching, and JSON metrics/health
 - **Structured Logging**: Configurable JSON or text logs with request/trace identifiers
-- **Plugin Middleware**: Configurable middleware chain (built-ins: logging, headers)
+- **Plugin Middleware**: Configurable middleware chain with built-in plugins:
+  - Logging - Request/response logging with trace IDs
+  - Size Limit - DoS protection via payload size limits
+  - Gzip Compression - Response compression with 10MB buffer limit
+  - Headers - Custom header injection
+  - Request ID - Auto-generated request identifiers
 
 ## Architecture
 
@@ -161,6 +176,15 @@ server:
     enabled: true # Enable TLS/SSL termination
     certFile: "certs/cert.pem" # Path to TLS certificate file
     keyFile: "certs/key.pem" # Path to TLS private key file
+  timeouts:
+    read: 15 # ReadTimeout in seconds (protects against slow-read attacks)
+    write: 15 # WriteTimeout in seconds (prevents slow writes)
+    idle: 60 # IdleTimeout in seconds (keep-alive timeout)
+    handler: 30 # Handler timeout in seconds (end-to-end request timeout)
+    shutdown: 30 # Graceful shutdown timeout in seconds
+    backend_dial: 10 # Backend connection dial timeout in seconds
+    backend_read: 30 # Backend response read timeout in seconds
+    backend_idle: 90 # Backend idle connection timeout in seconds
 
 backends:
   - name: "server1"
@@ -175,6 +199,10 @@ backends:
 
 load_balancer:
   strategy: "round_robin" # Options: "round_robin", "least_connections", "weighted_round_robin", "ip_hash"
+  websocket_pool:
+    enabled: true # Enable WebSocket connection pooling
+    max_idle_per_backend: 10 # Maximum idle connections per backend
+    idle_timeout_seconds: 300 # Idle connection timeout (5 minutes)
 
 health_checks:
   active:
@@ -188,7 +216,7 @@ health_checks:
     unhealthy_timeout: 15 # Time in seconds to keep backend unhealthy
 
 rate_limit:
-  enabled: true # Disabled by default
+  enabled: true
   max_tokens: 100 # Maximum tokens in bucket
   refill_rate_seconds: 1 # Refill rate in seconds
 
@@ -288,6 +316,51 @@ server:
     keyFile: "certs/key.pem"
 ```
 
+### Timeout Configuration
+
+Helios provides comprehensive timeout controls to protect against various attack vectors and ensure reliable service:
+
+**Server-side timeouts (protects Helios from malicious clients):**
+- `read` - Maximum duration for reading the entire request (default: 15s)
+  - Protects against slow-read attacks
+- `write` - Maximum duration before timing out writes of the response (default: 15s)
+  - Prevents slow writes from holding connections
+- `idle` - Maximum duration to wait for the next request when keep-alives are enabled (default: 60s)
+  - Manages connection lifecycle
+- `handler` - End-to-end timeout for the entire request handler (default: 30s)
+  - Ensures requests don't hang indefinitely
+- `shutdown` - Maximum duration for graceful shutdown (default: 30s)
+  - Allows in-flight requests to complete
+
+**Backend timeouts (controls Helios → backend communication):**
+- `backend_dial` - Maximum time to establish connection to backend (default: 10s)
+  - Fails fast if backend is unreachable
+- `backend_read` - Maximum time to wait for response from backend (default: 30s)
+  - Prevents hanging on slow backends
+- `backend_idle` - Maximum idle time for keep-alive connections to backends (default: 90s)
+  - Connection pooling optimization
+
+**Example configuration:**
+```yaml
+server:
+  port: 8080
+  timeouts:
+    read: 15
+    write: 15
+    idle: 60
+    handler: 30
+    shutdown: 30
+    backend_dial: 10
+    backend_read: 30
+    backend_idle: 90
+```
+
+**Production recommendations:**
+- Keep `handler` timeout lower than backend services' timeouts
+- Set `backend_read` based on your slowest acceptable backend response time
+- Adjust `backend_dial` based on network latency to your backends
+- Use shorter timeouts for public-facing services to prevent resource exhaustion
+
 ### Logging Configuration
 
 Helios emits structured logs using [zerolog](https://github.com/rs/zerolog) for efficient structured logging. Configure verbosity, output format, and observability headers via the `logging` block:
@@ -334,6 +407,11 @@ go build -o helios ./cmd/helios
 ```yaml
 server:
   port: 8080
+  timeouts:
+    read: 15
+    write: 15
+    idle: 60
+    handler: 30
 
 backends:
   - name: "server1"
@@ -348,6 +426,10 @@ backends:
 
 load_balancer:
   strategy: "round_robin" # round_robin, least_connections, weighted_round_robin, ip_hash
+  websocket_pool:
+    enabled: true
+    max_idle_per_backend: 10
+    idle_timeout_seconds: 300
 
 health_checks:
   active:
@@ -404,7 +486,12 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ### Local Development with Docker Compose
 
-Helios can be run locally with three Nginx backends using Docker Compose. This setup validates plugin behavior, health checks, and load balancing.
+Helios can be run locally with three backend servers using Docker Compose. This setup validates plugin behavior, health checks, and load balancing in a containerized environment.
+
+#### Prerequisites
+
+- Docker Engine 20.10 or higher
+- Docker Compose V2 or higher
 
 #### Services
 
@@ -413,55 +500,131 @@ Helios can be run locally with three Nginx backends using Docker Compose. This s
 | `helios`   | 8080    | Load balancer entrypoint                 |
 |            | 9090    | Metrics endpoint (`/metrics`, `/health`) |
 |            | 9091    | Admin API (token-protected)              |
-| `backend1` | 8081    | Nginx backend with default response      |
-| `backend2` | 8082    | Nginx backend with default response      |
-| `backend3` | 8083    | Nginx backend with default response      |
+| `backend1` | 8081    | Backend server instance 1                |
+| `backend2` | 8082    | Backend server instance 2                |
+| `backend3` | 8083    | Backend server instance 3                |
 
-#### Build Instructions
+#### Quick Start
 
-1. Ensure Docker and Docker Compose are installed.
-2. Clone the repo and navigate to the root directory.
-3. Build and launch:
-
+1. **Clone the repository**
    ```bash
-   docker-compose build --no-cache
-   docker-compose up
+   git clone https://github.com/0xReLogic/Helios.git
+   cd Helios
    ```
 
+2. **Build and start all services**
+   ```bash
+   docker-compose up --build
+   ```
+
+   Or run in detached mode:
+   ```bash
+   docker-compose up -d --build
+   ```
+
+3. **Test the load balancer**
+   ```bash
+   # Send request through load balancer
+   curl http://localhost:8080
+   
+   # Check metrics
+   curl http://localhost:9090/metrics
+   
+   # Check health status
+   curl http://localhost:9090/health
+   ```
+
+4. **Stop all services**
+   ```bash
+   docker-compose down
+   ```
+
+#### Configuration
+
+The Docker Compose setup uses `helios.docker.yaml` which differs from the standard `helios.yaml`:
+
+- **Backend addresses**: Uses Docker service names (`backend1:8080`) instead of localhost
+- **Health check path**: Configured for `/` instead of `/health`
+- **Timeouts**: Includes comprehensive timeout configuration for production readiness
+
+To modify the configuration, edit `helios.docker.yaml` and restart the services:
+
+```bash
+docker-compose restart helios
+```
+
 #### Health Check Behavior
-Helios performs active health checks on / for each backend every 10 seconds. Backends respond with:
 
-Backend is alive
+Helios performs active health checks on `/` for each backend every 10 seconds with a 7-second timeout. Backends respond with a success status when healthy.
 
-If a backend fails to respond, it is marked unhealthy for 30 seconds.
+If a backend fails to respond, it is marked unhealthy for 30 seconds before retry.
+
+#### Viewing Logs
+
+```bash
+# View all logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f helios
+docker-compose logs -f backend1
+```
 
 #### Admin API
 
-The Admin API is exposed on port 9091 and requires a token (configured in helios.docker.yaml). It provides:
+The Admin API is exposed on port 9091 and requires a token (configured in `helios.docker.yaml`). 
 
-- Backend status
+**Default token**: `change-me` (⚠️ Change this in production!)
 
-- Plugin chain inspection
+Example requests:
 
-- Circuit breaker metrics
+```bash
+# Get backend status
+curl -H "Authorization: Bearer change-me" http://localhost:9091/api/backends
+
+# Get circuit breaker metrics
+curl -H "Authorization: Bearer change-me" http://localhost:9091/api/metrics
+```
 
 #### Metrics
 
-Available at:
+Prometheus-compatible metrics are available at:
 
-- http://localhost:9090/metrics
-
-- http://localhost:9090/health
+- **Metrics endpoint**: http://localhost:9090/metrics
+- **Health endpoint**: http://localhost:9090/health
 
 #### Plugin Chain
 
 The default plugin chain includes:
 
-- logging: request logs with trace IDs
+- **logging**: Request logs with trace IDs and latency metrics
+- **size_limit**: Enforces payload size limits (10MB request, 50MB response)
+- **gzip**: Response compression for configured content types
+- **headers**: Injects custom headers (`X-App: Helios`, `X-From: LB`)
 
-- size_limit: enforces payload size
+#### Troubleshooting
 
-- headers: injects custom headers
+**Port conflicts**:
+```bash
+# Check if ports are already in use
+lsof -i :8080
+lsof -i :9090
+lsof -i :9091
+
+# Modify ports in docker-compose.yaml if needed
+```
+
+**Rebuild after code changes**:
+```bash
+docker-compose down
+docker-compose build --no-cache
+docker-compose up
+```
+
+**Clean up everything**:
+```bash
+docker-compose down -v --remove-orphans
+```
 
 ## License
 
