@@ -95,7 +95,7 @@ jobs:
         GOOS=darwin GOARCH=amd64 go build -o dist/helios-darwin-amd64 ./cmd/helios
         
     - name: Release
-      uses: softprops/action-gh-release@v1  # Using a more modern release action
+      uses: softprops/action-gh-release@v2  # Using a more modern release action
       with:
         files: |
           dist/helios-linux-amd64
