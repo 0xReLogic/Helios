@@ -135,7 +135,11 @@ func TestMaxCircuitBreakerLimit(t *testing.T) {
 	// Try to add more than MaxCircuitBreakerMetrics
 	for i := 0; i < MaxCircuitBreakerMetrics+10; i++ {
 		cbName := "cb-" + string(rune(i))
-		mc.UpdateCircuitBreakerState(cbName, "closed", 0, 0, 0)
+		mc.UpdateCircuitBreakerState(cbName, "closed", CircuitBreakerCounts{
+			FailureCount: 0,
+			SuccessCount: 0,
+			RequestCount: 0,
+		})
 	}
 
 	metrics := mc.GetMetrics()

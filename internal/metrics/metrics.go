@@ -205,8 +205,15 @@ func (mc *MetricsCollector) RecordRateLimitedRequest() {
 	atomic.AddUint64(&mc.metrics.RateLimitedRequests, 1)
 }
 
+// CircuitBreakerCounts holds the count values for circuit breaker updates
+type CircuitBreakerCounts struct {
+	FailureCount uint32
+	SuccessCount uint32
+	RequestCount uint32
+}
+
 // UpdateCircuitBreakerState updates the state of a circuit breaker
-func (mc *MetricsCollector) UpdateCircuitBreakerState(name, state string, failureCount, successCount, requestCount uint32) {
+func (mc *MetricsCollector) UpdateCircuitBreakerState(name, state string, counts CircuitBreakerCounts) {
 	mc.metrics.mutex.Lock()
 
 	// Prevent unbounded growth of circuit breaker metrics
@@ -224,9 +231,9 @@ func (mc *MetricsCollector) UpdateCircuitBreakerState(name, state string, failur
 	}
 
 	cbMetrics.State = state
-	cbMetrics.FailureCount = failureCount
-	cbMetrics.SuccessCount = successCount
-	cbMetrics.RequestCount = requestCount
+	cbMetrics.FailureCount = counts.FailureCount
+	cbMetrics.SuccessCount = counts.SuccessCount
+	cbMetrics.RequestCount = counts.RequestCount
 	cbMetrics.LastStateChange = time.Now()
 
 	mc.metrics.mutex.Unlock()

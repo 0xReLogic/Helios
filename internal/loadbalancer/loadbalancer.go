@@ -251,7 +251,11 @@ func (lb *LoadBalancer) setupCircuitBreaker(cfg *config.Config) {
 		OnStateChange: func(name string, from circuitbreaker.State, to circuitbreaker.State) {
 			logging.L().Info().Str("circuit_breaker", name).Str("from", from.String()).Str("to", to.String()).Msg("circuit breaker state changed")
 			failureCount, successCount, requestCount := lb.circuitBreaker.Counts()
-			lb.metricsCollector.UpdateCircuitBreakerState(name, to.String(), failureCount, successCount, requestCount)
+			lb.metricsCollector.UpdateCircuitBreakerState(name, to.String(), metrics.CircuitBreakerCounts{
+				FailureCount: failureCount,
+				SuccessCount: successCount,
+				RequestCount: requestCount,
+			})
 		},
 	}
 
@@ -343,28 +347,9 @@ func (lb *LoadBalancer) checkBackendHealth(backend *Backend) {
 		return
 	}
 
-	// Create a health check request with context
-	healthURL := *backend.URL
-	healthURL.Path = lb.healthChecks.activePath
-
-	req, err := http.NewRequestWithContext(lb.ctx, "GET", healthURL.String(), nil)
+	resp, err := lb.performHealthCheck(backend)
 	if err != nil {
-		logging.L().Error().Str("backend", backend.Name).Err(err).Msg("error creating health check request")
-		return
-	}
-
-	// Set a timeout for health checks based on configuration
-	client := &http.Client{
-		Timeout: lb.healthChecks.activeTimeout,
-	}
-
-	// Send the request
-	resp, err := client.Do(req)
-
-	// Check for errors or non-200 status codes
-	if err != nil {
-		logging.L().Error().Str("backend", backend.Name).Err(err).Msg("health check failed")
-		lb.MarkBackendUnhealthy(backend, lb.healthChecks.passiveTimeout)
+		lb.handleHealthCheckFailure(backend, err)
 		return
 	}
 	defer func() {
@@ -373,6 +358,34 @@ func (lb *LoadBalancer) checkBackendHealth(backend *Backend) {
 		}
 	}()
 
+	lb.processHealthCheckResponse(backend, resp)
+}
+
+// performHealthCheck sends a health check request to a backend
+func (lb *LoadBalancer) performHealthCheck(backend *Backend) (*http.Response, error) {
+	healthURL := *backend.URL
+	healthURL.Path = lb.healthChecks.activePath
+
+	req, err := http.NewRequestWithContext(lb.ctx, "GET", healthURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{
+		Timeout: lb.healthChecks.activeTimeout,
+	}
+
+	return client.Do(req)
+}
+
+// handleHealthCheckFailure handles a failed health check
+func (lb *LoadBalancer) handleHealthCheckFailure(backend *Backend, err error) {
+	logging.L().Error().Str("backend", backend.Name).Err(err).Msg("health check failed")
+	lb.MarkBackendUnhealthy(backend, lb.healthChecks.passiveTimeout)
+}
+
+// processHealthCheckResponse processes the health check response
+func (lb *LoadBalancer) processHealthCheckResponse(backend *Backend, resp *http.Response) {
 	if resp.StatusCode != http.StatusOK {
 		logging.L().Warn().Str("backend", backend.Name).Int("status", resp.StatusCode).Msg("health check returned non-ok status")
 		lb.MarkBackendUnhealthy(backend, lb.healthChecks.passiveTimeout)
@@ -632,31 +645,34 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleRequest handles the actual request processing
 func (lb *LoadBalancer) handleRequest(w http.ResponseWriter, r *http.Request, startTime time.Time) error {
-	// Find a healthy backend
-	var backend *Backend
-	for i := 0; i < 3; i++ { // Try up to 3 times to find a healthy backend
-		backend = lb.NextBackend(r)
-		if backend == nil {
-			http.Error(w, "No available backend servers", http.StatusServiceUnavailable)
-			return nil
-		}
-
-		// Check if the backend is healthy
-		if !lb.IsBackendHealthy(backend) {
-			continue // Try another backend
-		}
-
-		// Found a healthy backend
-		break
-	}
-
-	// If we couldn't find a healthy backend after retries
-	if backend == nil || !lb.IsBackendHealthy(backend) {
+	backend := lb.findHealthyBackend(r)
+	if backend == nil {
 		logging.WithContext(r.Context()).Warn().Str("path", r.URL.Path).Msg("no healthy backend available")
 		http.Error(w, "No healthy backend servers available", http.StatusServiceUnavailable)
 		return nil
 	}
 
+	// Process the request with the selected backend
+	return lb.proxyRequest(backend, w, r, startTime)
+}
+
+// findHealthyBackend attempts to find a healthy backend with retries
+func (lb *LoadBalancer) findHealthyBackend(r *http.Request) *Backend {
+	for i := 0; i < 3; i++ { // Try up to 3 times to find a healthy backend
+		backend := lb.NextBackend(r)
+		if backend == nil {
+			return nil
+		}
+
+		if lb.IsBackendHealthy(backend) {
+			return backend
+		}
+	}
+	return nil
+}
+
+// proxyRequest forwards the request to a backend and handles the response
+func (lb *LoadBalancer) proxyRequest(backend *Backend, w http.ResponseWriter, r *http.Request, startTime time.Time) error {
 	// Track the active connection
 	backend.IncrementConnections()
 	lb.metricsCollector.UpdateBackendConnections(backend.Name, backend.GetActiveConnections())
@@ -674,51 +690,60 @@ func (lb *LoadBalancer) handleRequest(w http.ResponseWriter, r *http.Request, st
 	backend.DecrementConnections()
 	lb.metricsCollector.UpdateBackendConnections(backend.Name, backend.GetActiveConnections())
 
-	// Record metrics
+	// Record metrics and handle passive health checks
+	lb.recordRequestMetrics(backend, rw.statusCode, startTime, r)
+
+	return nil
+}
+
+// recordRequestMetrics records metrics and performs passive health checks
+func (lb *LoadBalancer) recordRequestMetrics(backend *Backend, statusCode int, startTime time.Time, r *http.Request) {
 	responseTime := time.Since(startTime)
-	success := rw.statusCode < 500
+	success := statusCode < 500
 	lb.metricsCollector.RecordResponse(success, responseTime)
 	lb.metricsCollector.RecordBackendRequest(backend.Name, success, responseTime)
 
-	logger := logging.WithContext(r.Context())
-
 	// Check if the backend returned an error status code (5xx) and passive health checks are enabled
-	if rw.statusCode >= 500 && lb.healthChecks.passiveEnabled {
-		// Increment failure count for this backend
-		lb.healthChecks.unhealthyBackendMu.Lock()
-		lb.healthChecks.unhealthyBackends[backend.Name]++
-		failureCount := lb.healthChecks.unhealthyBackends[backend.Name]
-		lb.healthChecks.unhealthyBackendMu.Unlock()
-
-		logger.Warn().Str("backend", backend.Name).
-			Int("status", rw.statusCode).
-			Int("failure_count", failureCount).
-			Int("threshold", lb.healthChecks.passiveThreshold).
-			Msg("backend returned server error")
-
-		// If failure count exceeds threshold, mark as unhealthy
-		if failureCount >= lb.healthChecks.passiveThreshold {
-			lb.MarkBackendUnhealthy(backend, lb.healthChecks.passiveTimeout)
-
-			// Reset failure count
-			lb.healthChecks.unhealthyBackendMu.Lock()
-			lb.healthChecks.unhealthyBackends[backend.Name] = 0
-			lb.healthChecks.unhealthyBackendMu.Unlock()
-		}
-
-		return circuitbreaker.ErrCircuitBreakerOpen // Return error for circuit breaker
+	if statusCode >= 500 && lb.healthChecks.passiveEnabled {
+		lb.handlePassiveHealthCheck(backend, statusCode, r)
+		return
 	}
 
+	logger := logging.WithContext(r.Context())
 	latencyMs := float64(responseTime) / float64(time.Millisecond)
 	logger.Info().
 		Str("backend", backend.Name).
 		Str("method", r.Method).
 		Str("path", r.URL.Path).
-		Int("status", rw.statusCode).
+		Int("status", statusCode).
 		Float64("latency_ms", latencyMs).
 		Msg("request completed")
+}
 
-	return nil
+// handlePassiveHealthCheck handles passive health check logic for failed requests
+func (lb *LoadBalancer) handlePassiveHealthCheck(backend *Backend, statusCode int, r *http.Request) {
+	logger := logging.WithContext(r.Context())
+	// Increment failure count for this backend
+	lb.healthChecks.unhealthyBackendMu.Lock()
+	lb.healthChecks.unhealthyBackends[backend.Name]++
+	failureCount := lb.healthChecks.unhealthyBackends[backend.Name]
+	lb.healthChecks.unhealthyBackendMu.Unlock()
+
+	logger.Warn().Str("backend", backend.Name).
+		Int("status", statusCode).
+		Int("failure_count", failureCount).
+		Int("threshold", lb.healthChecks.passiveThreshold).
+		Msg("backend returned server error")
+
+	// If failure count exceeds threshold, mark as unhealthy
+	if failureCount >= lb.healthChecks.passiveThreshold {
+		lb.MarkBackendUnhealthy(backend, lb.healthChecks.passiveTimeout)
+
+		// Reset failure count
+		lb.healthChecks.unhealthyBackendMu.Lock()
+		lb.healthChecks.unhealthyBackends[backend.Name] = 0
+		lb.healthChecks.unhealthyBackendMu.Unlock()
+	}
 }
 
 // responseWriter is a custom ResponseWriter that captures the status code

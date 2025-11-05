@@ -170,45 +170,57 @@ func (p *WebSocketPool) cleanupLoop() {
 
 // cleanup removes stale connections from all backend pools
 func (p *WebSocketPool) cleanup() {
+	backends := p.getBackendNames()
+
+	for _, backend := range backends {
+		p.cleanupBackend(backend)
+	}
+}
+
+// getBackendNames returns a snapshot of all backend names
+func (p *WebSocketPool) getBackendNames() []string {
 	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	backends := make([]string, 0, len(p.pools))
 	for backend := range p.pools {
 		backends = append(backends, backend)
 	}
+	return backends
+}
+
+// cleanupBackend removes stale connections from a specific backend pool
+func (p *WebSocketPool) cleanupBackend(backend string) {
+	p.mu.RLock()
+	pool, exists := p.pools[backend]
 	p.mu.RUnlock()
 
-	for _, backend := range backends {
-		p.mu.RLock()
-		pool, exists := p.pools[backend]
-		p.mu.RUnlock()
+	if !exists {
+		return
+	}
 
-		if !exists {
-			continue
+	pool.mu.Lock()
+	validConns := make([]pooledConn, 0, len(pool.idle))
+	closedCount := 0
+
+	for _, pc := range pool.idle {
+		if time.Since(pc.lastUsed) > pool.idleTimeout {
+			_ = pc.conn.Close() // Best effort close, ignore error
+			closedCount++
+		} else {
+			validConns = append(validConns, pc)
 		}
+	}
 
-		pool.mu.Lock()
-		validConns := make([]pooledConn, 0, len(pool.idle))
-		closedCount := 0
+	pool.idle = validConns
+	pool.mu.Unlock()
 
-		for _, pc := range pool.idle {
-			if time.Since(pc.lastUsed) > pool.idleTimeout {
-				_ = pc.conn.Close() // Best effort close, ignore error
-				closedCount++
-			} else {
-				validConns = append(validConns, pc)
-			}
-		}
-
-		pool.idle = validConns
-		pool.mu.Unlock()
-
-		if closedCount > 0 {
-			logging.L().Debug().
-				Str("backend", backend).
-				Int("closed", closedCount).
-				Int("remaining", len(validConns)).
-				Msg("cleaned up stale WebSocket connections")
-		}
+	if closedCount > 0 {
+		logging.L().Debug().
+			Str("backend", backend).
+			Int("closed", closedCount).
+			Int("remaining", len(validConns)).
+			Msg("cleaned up stale WebSocket connections")
 	}
 }
 

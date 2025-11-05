@@ -45,30 +45,43 @@ func NewTokenBucketRateLimiter(maxTokens int, refillRate time.Duration) *TokenBu
 
 // Allow checks if a request from the given client IP is allowed with optimized locking
 func (rl *TokenBucketRateLimiter) Allow(clientIP string) bool {
-	// Fast path: try to load existing bucket without locking
-	value, exists := rl.buckets.Load(clientIP)
-	var b *bucket
-
-	if !exists {
-		// Create new bucket
-		b = &bucket{
-			tokens:     rl.maxTokens,
-			lastRefill: time.Now(),
-		}
-		// LoadOrStore ensures only one goroutine creates the bucket
-		actual, loaded := rl.buckets.LoadOrStore(clientIP, b)
-		if loaded {
-			// Another goroutine created it, use that one
-			b = actual.(*bucket)
-		}
-	} else {
-		b = value.(*bucket)
-	}
+	b := rl.getOrCreateBucket(clientIP)
 
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	// Refill tokens based on time elapsed
+	rl.refillTokens(b)
+
+	// Check if we have tokens available
+	if b.tokens > 0 {
+		b.tokens--
+		return true
+	}
+
+	return false
+}
+
+// getOrCreateBucket retrieves or creates a bucket for the client IP
+func (rl *TokenBucketRateLimiter) getOrCreateBucket(clientIP string) *bucket {
+	// Fast path: try to load existing bucket without locking
+	value, exists := rl.buckets.Load(clientIP)
+	if exists {
+		return value.(*bucket)
+	}
+
+	// Create new bucket
+	newBucket := &bucket{
+		tokens:     rl.maxTokens,
+		lastRefill: time.Now(),
+	}
+
+	// LoadOrStore ensures only one goroutine creates the bucket
+	actual, _ := rl.buckets.LoadOrStore(clientIP, newBucket)
+	return actual.(*bucket)
+}
+
+// refillTokens refills tokens based on time elapsed (must be called with bucket locked)
+func (rl *TokenBucketRateLimiter) refillTokens(b *bucket) {
 	now := time.Now()
 	elapsed := now.Sub(b.lastRefill)
 	tokensToAdd := int(elapsed / rl.refillRate)
@@ -80,14 +93,6 @@ func (rl *TokenBucketRateLimiter) Allow(clientIP string) bool {
 		}
 		b.lastRefill = now
 	}
-
-	// Check if we have tokens available
-	if b.tokens > 0 {
-		b.tokens--
-		return true
-	}
-
-	return false
 }
 
 // cleanupRoutine removes old buckets that haven't been used recently
