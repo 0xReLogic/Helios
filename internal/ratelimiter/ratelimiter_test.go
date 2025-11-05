@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/0xReLogic/Helios/internal/utils"
 )
 
 func TestTokenBucketRateLimiter(t *testing.T) {
@@ -159,7 +161,7 @@ func TestGetClientIP(t *testing.T) {
 			}
 			req.RemoteAddr = tt.remoteAddr
 
-			got := getClientIP(req)
+			got := utils.GetClientIP(req)
 			if got != tt.expectedIP {
 				t.Errorf("%s: got %q, want %q", tt.description, got, tt.expectedIP)
 			}

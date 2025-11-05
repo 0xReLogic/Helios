@@ -17,6 +17,7 @@ import (
 	"github.com/0xReLogic/Helios/internal/logging"
 	"github.com/0xReLogic/Helios/internal/metrics"
 	"github.com/0xReLogic/Helios/internal/ratelimiter"
+	"github.com/0xReLogic/Helios/internal/utils"
 )
 
 // Strategy defines the interface for load balancing strategies
@@ -551,7 +552,7 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Check rate limiting if enabled
 	if lb.rateLimiter != nil {
-		clientIP := getClientIP(r)
+		clientIP := utils.GetClientIP(r)
 		if !lb.rateLimiter.Allow(clientIP) {
 			lb.metricsCollector.RecordRateLimitedRequest()
 			logger.Warn().Str("client_ip", clientIP).Msg("request rate limited")
@@ -681,22 +682,6 @@ func (lb *LoadBalancer) handleRequest(w http.ResponseWriter, r *http.Request, st
 		Msg("request completed")
 
 	return nil
-}
-
-// getClientIP extracts the client IP from the request
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return xff
-	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
-	return r.RemoteAddr
 }
 
 // responseWriter is a custom ResponseWriter that captures the status code

@@ -1,11 +1,11 @@
 package ratelimiter
 
 import (
-	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/0xReLogic/Helios/internal/utils"
 )
 
 // RateLimiter defines the interface for rate limiting
@@ -114,7 +114,7 @@ func RateLimitMiddleware(rateLimiter RateLimiter) func(http.Handler) http.Handle
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Extract client IP
-			clientIP := getClientIP(r)
+			clientIP := utils.GetClientIP(r)
 
 			// Check rate limit
 			if !rateLimiter.Allow(clientIP) {
@@ -126,31 +126,4 @@ func RateLimitMiddleware(rateLimiter RateLimiter) func(http.Handler) http.Handle
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// getClientIP extracts the client IP from the request
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first
-	// X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
-	// We want only the first IP (the actual client)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Find the first comma to extract the first IP
-		if idx := strings.Index(xff, ","); idx > 0 {
-			return strings.TrimSpace(xff[:idx])
-		}
-		// No comma means single IP
-		return strings.TrimSpace(xff)
-	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr (includes port, but that's ok for rate limiting)
-	// Could use net.SplitHostPort if we want just IP without port
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		return host
-	}
-	return r.RemoteAddr
 }
