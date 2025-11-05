@@ -3,8 +3,9 @@ package plugins
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"net/http"
+
+	"github.com/0xReLogic/Helios/internal/logging"
 )
 
 func init() {
@@ -14,7 +15,8 @@ func init() {
 				b := make([]byte, 16)
 				_, err := rand.Read(b)
 				if err != nil {
-					fmt.Printf("Error generating request ID: %v\n", err)
+					logger := logging.WithContext(r.Context())
+					logger.Error().Err(err).Msg("failed to generate request ID")
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -29,3 +31,4 @@ func init() {
 		}, nil
 	})
 }
+
