@@ -1,9 +1,10 @@
 package main
 
 import (
+	"crypto/rand"
 	"flag"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -11,6 +12,16 @@ import (
 	"github.com/0xReLogic/Helios/internal/config"
 	"github.com/0xReLogic/Helios/internal/logging"
 )
+
+// secureRandomInt generates a cryptographically secure random integer in the range [0, max)
+func secureRandomInt(max int) int {
+	nBig, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	if err != nil {
+		// Fallback to 0 if random generation fails (extremely rare)
+		return 0
+	}
+	return int(nBig.Int64())
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -60,8 +71,8 @@ func main() {
 		requestLogger := logging.WithContext(r.Context()).With().Str("backend", *serverID).Logger()
 		requestLogger.Info().Str("method", r.Method).Str("path", r.URL.Path).Msg("request received")
 
-		// Simulate random failures if fail-rate is set
-		if *failRate > 0 && (rand.Intn(100) < *failRate) {
+		// Simulate random failures if fail-rate is set (using cryptographically secure random)
+		if *failRate > 0 && (secureRandomInt(100) < *failRate) {
 			requestLogger.Warn().Msg("simulating failure")
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Simulated failure from Backend Server %s!\n", *serverID)
@@ -73,8 +84,8 @@ func main() {
 
 	// Add a health check endpoint
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		// Simulate random failures if fail-rate is set
-		if *failRate > 0 && (rand.Intn(100) < *failRate) {
+		// Simulate random failures if fail-rate is set (using cryptographically secure random)
+		if *failRate > 0 && (secureRandomInt(100) < *failRate) {
 			logging.WithContext(r.Context()).Warn().Str("backend", *serverID).Msg("health check failing")
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Health check failed from Server %s", *serverID)
