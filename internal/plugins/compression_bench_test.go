@@ -244,23 +244,23 @@ func TestGzipMaxBufferSize(t *testing.T) {
 							"min_size":      float64(100),
 							"content_types": []interface{}{"application/json"},
 						},
+					},
 				},
-			},
-		}
+			}
 
-		baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			// Create large response body
-			largeBody := bytes.Repeat([]byte("x"), tt.responseSize)
-			_, _ = w.Write(largeBody)
-		})
+			baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// Create large response body
+				largeBody := bytes.Repeat([]byte("x"), tt.responseSize)
+				_, _ = w.Write(largeBody)
+			})
 
-	handler, err := BuildChain(pluginConfig, baseHandler)
-	if err != nil {
-		t.Fatalf("Failed to build plugin chain: %v", err)
-	}
+			handler, err := BuildChain(pluginConfig, baseHandler)
+			if err != nil {
+				t.Fatalf("Failed to build plugin chain: %v", err)
+			}
 
-	req := httptest.NewRequest("GET", "/test", nil)
+			req := httptest.NewRequest("GET", "/test", nil)
 			req.Header.Set("Accept-Encoding", "gzip")
 			rec := httptest.NewRecorder()
 

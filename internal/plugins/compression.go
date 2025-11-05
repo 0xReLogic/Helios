@@ -49,7 +49,7 @@ func (g *gzipResponseWriter) Write(b []byte) (int, error) {
 			g.bufferExceeded = true
 			// Flush existing buffer uncompressed
 			if g.buf.Len() > 0 {
-				g.ResponseWriter.Write(g.buf.Bytes())
+				_, _ = g.ResponseWriter.Write(g.buf.Bytes())
 				g.buf.Reset()
 			}
 		}
