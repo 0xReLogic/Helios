@@ -173,34 +173,34 @@ func main() {
 				serverErrors <- fmt.Errorf("tls certificate file not found: %s", cfg.Server.TLS.CertFile)
 				return
 			}
-		if _, err := os.Stat(cfg.Server.TLS.KeyFile); os.IsNotExist(err) {
-			serverErrors <- fmt.Errorf("tls key file not found: %s", cfg.Server.TLS.KeyFile)
-			return
-		}
+			if _, err := os.Stat(cfg.Server.TLS.KeyFile); os.IsNotExist(err) {
+				serverErrors <- fmt.Errorf("tls key file not found: %s", cfg.Server.TLS.KeyFile)
+				return
+			}
 
-		// Configure TLS with minimum version 1.2 for security
-		server.TLSConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			CipherSuites: []uint16{
-				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-			},
-			PreferServerCipherSuites: true,
-		}
+			// Configure TLS with minimum version 1.2 for security
+			server.TLSConfig = &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				CipherSuites: []uint16{
+					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				},
+				PreferServerCipherSuites: true,
+			}
 
-		logger.Info().Int("port", cfg.Server.Port).Msg("listening for https")
-		logger.Info().
-			Str("min_tls_version", "1.2").
-			Dur("read_timeout", readTimeout).
-			Dur("write_timeout", writeTimeout).
-			Dur("idle_timeout", idleTimeout).
-			Msg("server timeouts configured")
+			logger.Info().Int("port", cfg.Server.Port).Msg("listening for https")
+			logger.Info().
+				Str("min_tls_version", "1.2").
+				Dur("read_timeout", readTimeout).
+				Dur("write_timeout", writeTimeout).
+				Dur("idle_timeout", idleTimeout).
+				Msg("server timeouts configured")
 
-		serverErrors <- server.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile)
+			serverErrors <- server.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile)
 		} else {
 			logger.Info().Int("port", cfg.Server.Port).Msg("listening for http")
 			logger.Info().
