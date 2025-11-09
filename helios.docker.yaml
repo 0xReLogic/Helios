@@ -63,6 +63,13 @@ admin_api:
   enabled: true
   port: 9091 # Port for admin API server
   auth_token: "change-me" # JWT token for authentication (change in production)
+  # IP-based access control (optional)
+  # ip_allow_list:
+  #   - "127.0.0.1"           # Allow localhost
+  #   - "192.168.1.0/24"      # Allow local network
+  #   - "10.0.0.0/8"          # Allow private network
+  # ip_deny_list:
+  #   - "203.0.113.0/24"      # Block specific subnet
 
 metrics:
   enabled: true

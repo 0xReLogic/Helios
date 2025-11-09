@@ -28,10 +28,26 @@ func newTestLB(t *testing.T) *loadbalancer.LoadBalancer {
 	return lb
 }
 
+func newTestConfig(token string) *config.Config {
+	return &config.Config{
+		AdminAPI: config.AdminAPIConfig{
+			Enabled:   true,
+			Port:      9091,
+			AuthToken: token,
+		},
+		LoadBalancer: config.LoadBalancerConfig{Strategy: "round_robin"},
+		HealthChecks: config.HealthChecksConfig{
+			Active:  config.ActiveHealthCheckConfig{Enabled: false},
+			Passive: config.PassiveHealthCheckConfig{Enabled: false},
+		},
+	}
+}
+
 func TestAdminAPI_Health_NoAuth(t *testing.T) {
 	lb := newTestLB(t)
 	mc := metrics.NewMetricsCollector()
-	mux := NewMux(lb, "", mc)
+	cfg := newTestConfig("")
+	mux := NewMux(lb, cfg, mc)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	rec := httptest.NewRecorder()
@@ -45,7 +61,8 @@ func TestAdminAPI_Health_NoAuth(t *testing.T) {
 func TestAdminAPI_Metrics_WithAuth(t *testing.T) {
 	lb := newTestLB(t)
 	mc := metrics.NewMetricsCollector()
-	mux := NewMux(lb, "secret", mc)
+	cfg := newTestConfig("secret")
+	mux := NewMux(lb, cfg, mc)
 
 	// Without token -> 401
 	req := httptest.NewRequest(http.MethodGet, "/v1/metrics", nil)
@@ -72,7 +89,8 @@ func TestAdminAPI_Metrics_WithAuth(t *testing.T) {
 func TestAdminAPI_Backends_Add_List_Remove_WithAuth(t *testing.T) {
 	lb := newTestLB(t)
 	mc := metrics.NewMetricsCollector()
-	mux := NewMux(lb, "secret", mc)
+	cfg := newTestConfig("secret")
+	mux := NewMux(lb, cfg, mc)
 
 	// Initially zero backends
 	reqList := httptest.NewRequest(http.MethodGet, "/v1/backends", nil)
@@ -146,7 +164,8 @@ func TestAdminAPI_Backends_Add_List_Remove_WithAuth(t *testing.T) {
 func TestAdminAPI_Strategy_Set_WithAuth(t *testing.T) {
 	lb := newTestLB(t)
 	mc := metrics.NewMetricsCollector()
-	mux := NewMux(lb, "secret", mc)
+	cfg := newTestConfig("secret")
+	mux := NewMux(lb, cfg, mc)
 
 	// Valid strategy
 	body := []byte(`{"strategy":"least_connections"}`)

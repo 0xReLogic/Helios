@@ -115,9 +115,11 @@ type MetricsConfig struct {
 
 // AdminAPIConfig holds the Admin API configuration
 type AdminAPIConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	Port      int    `yaml:"port"`
-	AuthToken string `yaml:"auth_token,omitempty"`
+	Enabled     bool     `yaml:"enabled"`
+	Port        int      `yaml:"port"`
+	AuthToken   string   `yaml:"auth_token,omitempty"`
+	IPAllowList []string `yaml:"ip_allow_list,omitempty"`
+	IPDenyList  []string `yaml:"ip_deny_list,omitempty"`
 }
 
 // PluginConfig represents a single plugin in the chain

@@ -65,7 +65,7 @@ func setupAdminAPIServer(cfg *config.Config, lb *loadbalancer.LoadBalancer) {
 	}
 
 	mc := lb.GetMetricsCollector()
-	adminHandler := adminapi.NewMux(lb, cfg.AdminAPI.AuthToken, mc)
+	adminHandler := adminapi.NewMux(lb, cfg, mc)
 	adminServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", adminPort),
 		Handler: adminHandler,

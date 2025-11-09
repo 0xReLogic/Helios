@@ -13,18 +13,18 @@ import (
 )
 
 // NewMux creates an HTTP handler for the Admin API
-func NewMux(lb *loadbalancer.LoadBalancer, token string, mc *metrics.MetricsCollector) http.Handler {
+func NewMux(lb *loadbalancer.LoadBalancer, cfg *config.Config, mc *metrics.MetricsCollector) http.Handler {
 	mux := http.NewServeMux()
 
 	// Auth middleware
 	auth := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if token == "" {
+			if cfg.AdminAPI.AuthToken == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
 			authz := r.Header.Get("Authorization")
-			if !strings.HasPrefix(authz, "Bearer ") || strings.TrimPrefix(authz, "Bearer ") != token {
+			if !strings.HasPrefix(authz, "Bearer ") || strings.TrimPrefix(authz, "Bearer ") != cfg.AdminAPI.AuthToken {
 				w.WriteHeader(http.StatusUnauthorized)
 				_, _ = w.Write([]byte("unauthorized"))
 				return
@@ -127,5 +127,20 @@ func NewMux(lb *loadbalancer.LoadBalancer, token string, mc *metrics.MetricsColl
 	})))
 
 	logging.L().Info().Msg("admin api mux initialized")
+
+	// Apply IP filter if configured
+	if len(cfg.AdminAPI.IPAllowList) > 0 || len(cfg.AdminAPI.IPDenyList) > 0 {
+		ipFilter, err := NewIPFilter(cfg.AdminAPI.IPAllowList, cfg.AdminAPI.IPDenyList)
+		if err != nil {
+			logging.L().Error().Err(err).Msg("failed to create IP filter")
+			return mux
+		}
+		logging.L().Info().
+			Int("allow_list_size", len(cfg.AdminAPI.IPAllowList)).
+			Int("deny_list_size", len(cfg.AdminAPI.IPDenyList)).
+			Msg("admin api IP filter enabled")
+		return ipFilter.Middleware(mux)
+	}
+
 	return mux
 }

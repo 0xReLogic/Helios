@@ -489,6 +489,30 @@ The Admin API provides runtime control and monitoring capabilities with JWT auth
 **Authentication:**
 All endpoints except `/v1/health` require a JWT token passed via the `Authorization: Bearer <token>` header.
 
+**IP-Based Access Control:**
+The Admin API supports IP allow/deny lists for enhanced security. Configure IP filtering using CIDR notation:
+
+```yaml
+admin_api:
+  enabled: true
+  port: 9091
+  auth_token: "change-me"
+  ip_allow_list:
+    - "127.0.0.1"           # Allow localhost
+    - "192.168.1.0/24"      # Allow local network
+    - "10.0.0.0/8"          # Allow private network
+  ip_deny_list:
+    - "203.0.113.0/24"      # Block specific subnet
+```
+
+**IP Filter Behavior:**
+- If `ip_allow_list` is specified, only IPs in the list are allowed
+- If `ip_deny_list` is specified, IPs in the list are blocked
+- Deny list takes precedence over allow list
+- If both lists are empty, all IPs are allowed
+- Supports both single IPs (`127.0.0.1`) and CIDR notation (`192.168.1.0/24`)
+- Blocked requests receive HTTP 403 (Forbidden)
+
 **Example Usage:**
 ```bash
 # Check health (no auth)
@@ -526,6 +550,7 @@ curl -X POST -H "Authorization: Bearer change-me" \
 
 - [Plugin Development Guide](docs/plugin-development.md) - Learn how to create custom plugins
   - Example plugins: `internal/plugins/examples`
+- [Admin API Security](docs/admin-api-security.md) - IP filtering and authentication guide
 
 ## Contributing
 
