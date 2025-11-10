@@ -35,7 +35,7 @@ jobs:
       run: go test -v ./... -short  # Added -short flag to skip long-running tests
       
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v8  # Updated to v3
+      uses: golangci/golangci-lint-action@v9  # Updated to v3
       with:
         version: latest
         args: --timeout=5m
