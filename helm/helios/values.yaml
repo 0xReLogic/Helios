@@ -1,0 +1,107 @@
+replicaCount: 3
+
+enabled: false
+certFile: "certs/cert.pem"
+keyFile: "certs/key.pem"
+
+backends:
+- name: "server1"
+  address: "http://localhost:8081"
+  weight: 5
+- name: "server2"
+  address: "http://localhost:8082"
+  weight: 2
+- name: "server3"
+  address: "http://localhost:8083"
+  weight: 1
+
+load_balancer:
+  strategy: "ip_hash"
+
+health_checks:
+  active:
+    enabled: true
+    interval: 10
+    timeout: 7
+    path: "/"
+  passive:
+    enabled: true
+    unhealthy_threshold: 3
+    unhealthy_timeout: 30
+
+rate_limit:
+  enabled: true
+  max_tokens: 100
+  refill_rate_seconds: 1
+
+circuit_breaker:
+  enabled: true
+  max_requests: 5
+  interval_seconds: 60
+  timeout_seconds: 60
+  failure_threshold: 5
+  success_threshold: 2
+
+adminAPI:
+  enabled: true
+  port: 9091
+  auth_token: "change-me"
+
+metrics:
+  enabled: true
+  port: 9090
+  path: "/metrics"
+
+plugins:
+  enabled: true
+  chain:
+  - name: logging
+  - name: headers
+    config:
+      set:
+        X-App: Helios
+      request_set:
+        X-From: LB
+
+tls:
+  enabled: false
+  secretName: helios-tls
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+extraEnv: []
+extraArgs: []
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 8080
+  metricsPort: 9090
+  adminPort: 9091
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+  - host: helios.local
+    paths:
+    - path: /
+      pathType: Prefix
+  tls: []
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+image:
+  repository: "helios/helios" # or your Docker image path
+  tag: "latest" # image tag
+  pullPolicy: "IfNotPresent" # optional, default pull policy
