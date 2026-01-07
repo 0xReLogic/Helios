@@ -59,6 +59,4 @@ updates:
       prefix: "ci"
       include: "scope"
 
-# Note: Schedule changed to daily for testing
-# Will revert to weekly after Dependabot verification
 

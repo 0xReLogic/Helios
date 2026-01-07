@@ -1,0 +1,69 @@
+# Configuration for PR Labeler workflow
+# Labels PRs based on changed files
+
+# Core components
+core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'cmd/**/*'
+          - 'internal/proxy/**/*'
+          - 'internal/loadbalancer/**/*'
+
+# Configuration changes
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/config/**/*'
+          - 'helios.yaml'
+          - '*.yaml'
+          - '*.yml'
+
+# Plugin system
+plugins:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/plugins/**/*'
+
+# Documentation
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**/*'
+
+# Tests
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*_test.go'
+
+# CI/CD
+ci/cd:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**/*'
+          - 'Dockerfile*'
+          - 'docker-compose*.yaml'
+
+# Dependencies
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'go.mod'
+          - 'go.sum'
+
+# Metrics & Observability
+observability:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/metrics/**/*'
+          - 'internal/logging/**/*'
+
+# Security
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/ratelimiter/**/*'
+          - 'internal/circuitbreaker/**/*'
+          - 'internal/adminapi/**/*'
+          - 'certs/**/*'

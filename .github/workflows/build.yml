@@ -14,16 +14,16 @@ jobs:
       fail-fast: false  # Don't fail all jobs if one fails
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        go: ['1.18', '1.19', '1.20']
+        go: ['1.22', '1.23', '1.24']
     
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v6  # Updated to v4
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go }}
       
     - name: Check out code
-      uses: actions/checkout@v6  # Updated to v3
+      uses: actions/checkout@v6
       
     - name: Get dependencies
       run: go mod download
@@ -35,7 +35,7 @@ jobs:
       run: go test -v ./... -short  # Added -short flag to skip long-running tests
       
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v9  # Updated to v3
+      uses: golangci/golangci-lint-action@v6
       with:
         version: latest
         args: --timeout=5m
@@ -48,21 +48,21 @@ jobs:
     
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v6  # Updated to v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.20'
+        go-version: '1.24'
       
     - name: Check out code
-      uses: actions/checkout@v6  # Updated to v3
+      uses: actions/checkout@v6
       
     - name: Get dependencies
       run: go mod download
       
     - name: Generate coverage report
-      run: go test -coverprofile=coverage.txt -covermode=atomic ./... -short  # Added -short flag
+      run: go test -coverprofile=coverage.txt -covermode=atomic ./... -short
       
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5  # Updated to v3
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.txt
         fail_ci_if_error: false
@@ -77,12 +77,12 @@ jobs:
     
     steps:
     - name: Check out code
-      uses: actions/checkout@v6  # Updated to v3
+      uses: actions/checkout@v6
       
     - name: Set up Go
-      uses: actions/setup-go@v6  # Updated to v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.20'
+        go-version: '1.24'
         
     - name: Get dependencies
       run: go mod download
