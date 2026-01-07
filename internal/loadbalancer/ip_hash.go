@@ -67,11 +67,12 @@ func (iph *IPHashStrategy) NextBackend(r *http.Request) *Backend {
 
 	// Hash the IP address
 	hash := fnv.New32a()
-	hash.Write([]byte(ipStr))
+	_, _ = hash.Write([]byte(ipStr)) // #nosec G104 - hash.Write never returns an error for fnv
+
 	hashValue := hash.Sum32()
 
 	// Select a backend
-	index := int(hashValue % uint32(len(healthyBackends)))
+	index := int(hashValue % uint32(len(healthyBackends))) // #nosec G115 - len() is always non-negative, safe conversion
 	return healthyBackends[index]
 }
 

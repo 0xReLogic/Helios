@@ -99,12 +99,13 @@ func (iph *IPHashConsistentStrategy) NextBackend(r *http.Request) *Backend {
 
 	// Hash the IP address
 	hash := fnv.New32a()
-	hash.Write([]byte(ipStr))
+	_, _ = hash.Write([]byte(ipStr)) // #nosec G104 - hash.Write never returns an error for fnv
+
 	hashValue := hash.Sum32()
 
 	// Use Jump Consistent Hash to select backend
 	// This ensures minimal remapping when backends are added/removed
-	index := jumpHash(uint64(hashValue), int32(len(healthyBackends)))
+	index := jumpHash(uint64(hashValue), int32(len(healthyBackends))) // #nosec G115 - len() is always non-negative, safe conversion
 	return healthyBackends[index]
 }
 

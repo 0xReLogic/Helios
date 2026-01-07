@@ -1,0 +1,9 @@
+# CodeQL configuration for Helios
+name: "Helios CodeQL Config"
+
+# Exclude test certificates from secret scanning
+# These are intentionally included for development/testing purposes
+# See certs/README.md for details
+paths-ignore:
+  - 'certs/**'
+  - '**/*_test.go'

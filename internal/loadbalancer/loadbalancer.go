@@ -243,11 +243,11 @@ func (lb *LoadBalancer) setupCircuitBreaker(cfg *config.Config) {
 
 	cbSettings := circuitbreaker.Settings{
 		Name:             "helios-lb",
-		MaxRequests:      uint32(cfg.CircuitBreaker.MaxRequests),
+		MaxRequests:      uint32(cfg.CircuitBreaker.MaxRequests),      // #nosec G115 - config validated to be non-negative
 		Interval:         time.Duration(cfg.CircuitBreaker.IntervalSeconds) * time.Second,
 		Timeout:          time.Duration(cfg.CircuitBreaker.TimeoutSeconds) * time.Second,
-		FailureThreshold: uint32(cfg.CircuitBreaker.FailureThreshold),
-		SuccessThreshold: uint32(cfg.CircuitBreaker.SuccessThreshold),
+		FailureThreshold: uint32(cfg.CircuitBreaker.FailureThreshold), // #nosec G115 - config validated to be positive
+		SuccessThreshold: uint32(cfg.CircuitBreaker.SuccessThreshold), // #nosec G115 - config validated to be positive
 		OnStateChange: func(name string, from circuitbreaker.State, to circuitbreaker.State) {
 			logging.L().Info().Str("circuit_breaker", name).Str("from", from.String()).Str("to", to.String()).Msg("circuit breaker state changed")
 			failureCount, successCount, requestCount := lb.circuitBreaker.Counts()

@@ -37,8 +37,11 @@ func setupMetricsServer(cfg *config.Config, lb *loadbalancer.LoadBalancer) {
 	metricsMux.HandleFunc("/health", metricsCollector.HealthHandler())
 
 	metricsServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", metricsPort),
-		Handler: metricsMux,
+		Addr:         fmt.Sprintf(":%d", metricsPort),
+		Handler:      metricsMux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	// Start metrics server in background
@@ -67,8 +70,11 @@ func setupAdminAPIServer(cfg *config.Config, lb *loadbalancer.LoadBalancer) {
 	mc := lb.GetMetricsCollector()
 	adminHandler := adminapi.NewMux(lb, cfg, mc)
 	adminServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", adminPort),
-		Handler: adminHandler,
+		Addr:         fmt.Sprintf(":%d", adminPort),
+		Handler:      adminHandler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	go func() {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -112,10 +113,17 @@ func main() {
 	// Add a websocket echo endpoint
 	http.HandleFunc("/ws", handleWebSocket)
 
-	// Start server
+	// Start server with timeouts to prevent slowloris attacks
 	addr := fmt.Sprintf(":%d", *port)
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      nil, // Use DefaultServeMux
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
 	logger.Info().Str("backend", *serverID).Int("port", *port).Msg("backend server starting")
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		logger.Fatal().Err(err).Str("backend", *serverID).Msg("backend server failed")
 	}
 }

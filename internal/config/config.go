@@ -157,6 +157,7 @@ type TraceConfig struct {
 
 // LoadConfig loads configuration from the specified YAML file
 func LoadConfig(filePath string) (*Config, error) {
+	// #nosec G304 - filePath is provided by trusted admin/user at startup
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading config file: %w", err)
