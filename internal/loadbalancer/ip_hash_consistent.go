@@ -41,14 +41,16 @@ func NewIPHashConsistentStrategy() *IPHashConsistentStrategy {
 // jumpHash implements the Jump Consistent Hash algorithm.
 // Paper: https://arxiv.org/abs/1406.2294
 // This algorithm guarantees minimal key remapping when the number of buckets changes.
+// #nosec G115 - Integer conversions are safe: numBuckets is validated positive,
+// and the algorithm is designed to work with these specific integer types
 func jumpHash(key uint64, numBuckets int32) int32 {
 	var b int64 = -1
 	var j int64 = 0
 
-	for j < int64(numBuckets) {
+	for j < int64(numBuckets) { // #nosec G115
 		b = j
 		key = key*2862933555777941757 + 1
-		j = (b + 1) * (int64(1<<31) / int64((key>>33)+1))
+		j = (b + 1) * (int64(1<<31) / int64((key>>33)+1)) // #nosec G115
 	}
 	return int32(b)
 }
