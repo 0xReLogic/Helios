@@ -43,3 +43,4 @@ jobs:
           alert-threshold: '150%'
           fail-on-alert: false
           summary-always: true
+          skip-fetch-gh-pages: true
