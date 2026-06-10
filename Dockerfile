@@ -16,7 +16,7 @@ COPY certs/ certs/
 RUN go build -o helios ./cmd/helios
 
 # Stage 2: Runtime
-FROM alpine:3.23
+FROM alpine:3.24
 WORKDIR /app
 
 # Copy built binary and config
